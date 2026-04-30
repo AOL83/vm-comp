@@ -3,493 +3,605 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Production-Grade PC Inspection Bench – Proper PCB Routing, Code-to-Pin Mapping</title>
+  <title>ReverseLab – Visual Product Reverse Engineering Tool</title>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0a0a14;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a14; overflow: hidden; }
+    /* Layout grid */
+    #app {
+      display: grid;
+      grid-template-rows: 48px 1fr 40px;
+      grid-template-columns: 260px 1fr 360px;
+      height: 100vh;
     }
-    /* ---- Top toolbar ---- */
-    #toolbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 45px;
-      background: rgba(10, 10, 20, 0.92);
+    #command-bar {
+      grid-column: 1 / -1;
+      background: rgba(12, 12, 25, 0.95);
       backdrop-filter: blur(12px);
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 16px;
       padding: 0 20px;
-      z-index: 40;
-      border-bottom: 1px solid rgba(255,255,255,0.15);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      z-index: 50;
     }
-    .tool-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .cmd-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
       color: #ccc;
-    }
-    button {
-      background: #4a90e2;
-      border: none;
-      color: white;
-      padding: 5px 15px;
-      border-radius: 5px;
+      padding: 5px 14px;
+      border-radius: 6px;
       cursor: pointer;
-      font-weight: 600;
-    }
-    button:disabled {
-      background: #555;
-      cursor: default;
-    }
-    input[type=range] {
-      width: 90px;
-    }
-    /* Inspector panel */
-    #inspector {
-      position: fixed;
-      right: 20px;
-      top: 100px;
-      width: 360px;
-      background: rgba(15, 15, 30, 0.95);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 16px;
-      padding: 20px;
-      color: #ddd;
-      z-index: 35;
-      display: none;
-      flex-direction: column;
-      gap: 15px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.7);
-    }
-    #inspector h3 { margin:0; color:#8ab4f8; }
-    canvas.pin-diagram {
-      width: 100%;
-      height: 160px;
-      background: #0d0d20;
-      border-radius: 8px;
-    }
-    .code-snippet {
-      background: #111122;
-      padding: 10px;
-      font-family: monospace;
+      font-weight: 500;
+      transition: 0.2s;
+      text-transform: uppercase;
       font-size: 0.8rem;
     }
-    .highlight { background: #4a90e2; color: white; }
-    /* Clipping plane indicator */
-    #clip-info {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
+    .cmd-btn:hover { background: rgba(255,255,255,0.15); }
+    .cmd-btn.active { background: #4a90e2; border-color: #4a90e2; color: white; }
+    .cmd-btn:disabled { opacity: 0.4; cursor: default; }
+
+    #product-library {
+      background: rgba(15, 15, 30, 0.95);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid rgba(255,255,255,0.1);
+      overflow-y: auto;
+      padding: 15px;
+      color: #ddd;
+      z-index: 40;
+    }
+    .library-category {
+      font-weight: bold;
+      color: #8ab4f8;
+      margin: 15px 0 6px;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+    }
+    .library-item {
+      background: rgba(255,255,255,0.06);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 4px 0;
+      cursor: grab;
+      user-select: none;
+      transition: 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .library-item:active { cursor: grabbing; }
+    .library-item.dragging-source { opacity: 0.3; }
+
+    #workspace {
+      position: relative;
+      background: radial-gradient(circle at center, #1c1c2e 0%, #0a0a14 80%);
+      overflow: hidden;
+    }
+    #workspace canvas { display: block; }
+
+    #inspector-panel {
+      background: rgba(15, 15, 30, 0.95);
+      backdrop-filter: blur(15px);
+      border-left: 1px solid rgba(255,255,255,0.15);
+      color: #ddd;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      z-index: 40;
+      transition: transform 0.3s;
+    }
+    #inspector-panel.hidden { transform: translateX(360px); }
+    .inspector-tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 8px;
+    }
+    .inspector-tab {
+      background: none;
+      border: none;
       color: #aaa;
-      font-size: 0.85rem;
-      background: rgba(0,0,0,0.6);
-      padding: 5px 12px;
-      border-radius: 6px;
+      padding: 4px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .inspector-tab.active { background: #4a90e2; color: white; }
+    .inspector-content { flex: 1; overflow-y: auto; }
+
+    #console {
+      grid-column: 1 / -1;
+      background: #0d0d18;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      color: #8a8a9a;
+      padding: 6px 20px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      overflow-x: auto;
+    }
+    .log-entry { white-space: nowrap; }
+    .log-time { color: #4a90e2; margin-right: 8px; }
+
+    /* Drag ghost */
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.9;
+      background: #4a90e2;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
   </style>
 </head>
 <body>
-  <div id="toolbar">
-    <div class="tool-group">
-      <span>🔍 Case Opacity</span>
-      <input type="range" id="opacity-slider" min="0" max="100" value="100">
-    </div>
-    <div class="tool-group">
-      <button id="clip-toggle">🧠 Clip Plane OFF</button>
-      <input type="range" id="clip-slider" min="-1.5" max="1.5" value="0" step="0.01" disabled>
-    </div>
-    <button id="reset-view">↺ Reset View</button>
+<div id="app">
+  <!-- Command Bar -->
+  <div id="command-bar">
+    <button class="cmd-btn" id="mode-inspect">🔍 Inspect</button>
+    <button class="cmd-btn" id="mode-move">✋ Move</button>
+    <button class="cmd-btn" id="mode-connect">🔗 Connect</button>
+    <button class="cmd-btn" id="mode-explode">💥 Explode</button>
+    <button class="cmd-btn" id="import-manual">📄 Import Manual</button>
+    <button class="cmd-btn" id="undo-btn" disabled>↩ Undo</button>
+    <button class="cmd-btn" id="redo-btn" disabled>↪ Redo</button>
   </div>
-  <div id="inspector">
-    <button id="close-inspector" style="align-self:flex-end; background:transparent; border:1px solid #aaa; color:#aaa;">✕</button>
-    <h3 id="inspector-title">Component</h3>
-    <canvas id="pin-diagram" class="pin-diagram" width="320" height="160"></canvas>
-    <div class="code-snippet" id="inspector-code"></div>
-    <button id="step-btn" disabled>▶ Step Instruction</button>
-    <div style="font-size:0.8rem; color:#aaa;" id="exec-status"></div>
+
+  <!-- Product Library -->
+  <div id="product-library">
+    <h3 style="margin-bottom:10px;">📦 Catalogue</h3>
+    <div class="library-category">Systems</div>
+    <div class="library-item" data-type="raspberrypi" data-name="Raspberry Pi 4">Raspberry Pi 4</div>
+    <div class="library-item" data-type="drill" data-name="Electric Drill">Electric Drill</div>
+    <div class="library-category">Electronics</div>
+    <div class="library-item" data-type="motor" data-name="DC Motor">DC Motor 12V</div>
+    <div class="library-item" data-type="battery" data-name="Li-ion Pack">Li-ion Battery</div>
+    <div class="library-category">Mechanical</div>
+    <div class="library-item" data-type="gearbox" data-name="Planetary Gearbox">Planetary Gearbox</div>
+    <div class="library-item" data-type="frame" data-name="Drone Frame">Drone Frame</div>
   </div>
-  <div id="clip-info">Clip plane at Z = 0.0</div>
 
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.152.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.152.0/examples/jsm/"
-      }
+  <!-- 3D Workspace -->
+  <div id="workspace"></div>
+
+  <!-- Inspector Panel -->
+  <div id="inspector-panel" class="hidden">
+    <div style="display:flex; justify-content:space-between;">
+      <strong id="inspector-title">Select a component</strong>
+      <button style="background:none;border:none;color:#aaa;cursor:pointer;" id="close-inspector">✕</button>
+    </div>
+    <div class="inspector-tabs">
+      <button class="inspector-tab active" data-tab="overview">Overview</button>
+      <button class="inspector-tab" data-tab="parts">Parts</button>
+      <button class="inspector-tab" data-tab="connections">Connections</button>
+      <button class="inspector-tab" data-tab="specs">Specs</button>
+      <button class="inspector-tab" data-tab="upgrades">Upgrades</button>
+    </div>
+    <div class="inspector-content" id="inspector-content"></div>
+  </div>
+
+  <!-- Console -->
+  <div id="console">
+    <span style="color:#4a90e2; font-weight:bold;">LOG:</span>
+    <span id="log-container"></span>
+  </div>
+</div>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.152.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.152.0/examples/jsm/"
     }
-  </script>
+  }
+</script>
 
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    // ---------------- REAL PCB MODEL ----------------
-    // We'll define a realistic motherboard with known pin positions and routes.
-    // All coordinates in mm, scaled to world units (1 unit = 10 mm for visibility).
-    const scale = 0.1; // 1 unit = 10mm, so motherboard ~ 24cm x 19cm -> 2.4x1.9 units
-    const boardWidth = 2.4, boardHeight = 1.9;
-    const boardThickness = 0.08;
+  // ---------- APPLICATION STATE ----------
+  const state = {
+    mode: 'inspect',       // inspect | move | connect | explode
+    objects: [],           // placed 3D objects { id, mesh, product, position }
+    selectedId: null,
+    history: [],
+    historyIndex: -1,
+    log: []
+  };
 
-    // Pin definitions (world coordinates, relative to board center)
-    // CPU socket: 4x4 grid of pads (LGA-like)
-    const cpuPins = [];
-    for (let i=-1.5; i<=1.5; i+=1) {
-      for (let j=-0.3; j<=0.9; j+=0.6) {
-        cpuPins.push({ pos: new THREE.Vector3(i*0.15, -0.44, j*0.15+0.2), label: `CPU_P${cpuPins.length}` });
-      }
-    }
-    // RAM slot pins (two slots)
-    const ram0Pins = [];
-    for (let k=0; k<12; k++) {
-      ram0Pins.push({ pos: new THREE.Vector3(-0.7 + k*0.03, -0.44, 0.65), label: `RAM0_${k}` });
-    }
-    const ram1Pins = [];
-    for (let k=0; k<12; k++) {
-      ram1Pins.push({ pos: new THREE.Vector3(0.7 - k*0.03, -0.44, 0.65), label: `RAM1_${k}` });
-    }
-    // PCIe slot pins
-    const pciePins = [];
-    for (let m=0; m<16; m++) {
-      pciePins.push({ pos: new THREE.Vector3(0.5, -0.44, -0.4 + m*0.04), label: `PCIE_${m}` });
-    }
+  // ---------- 3D SCENE SETUP ----------
+  const workspace = document.getElementById('workspace');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0c0c18);
+  const camera = new THREE.PerspectiveCamera(45, workspace.clientWidth / workspace.clientHeight, 0.5, 50);
+  camera.position.set(5, 3, 6);
+  camera.lookAt(0, 0, 0);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(workspace.clientWidth, workspace.clientHeight);
+  renderer.shadowMap.enabled = true;
+  workspace.appendChild(renderer.domElement);
 
-    // Routing rules: we'll precompute trace segments connecting specific pins.
-    // For demonstration, connect CPU memory bus to RAM slots and PCIe.
-    const routes = [
-      { from: cpuPins[0].pos, to: ram0Pins[0].pos, signal: 'DQ0' },
-      { from: cpuPins[1].pos, to: ram0Pins[1].pos, signal: 'DQ1' },
-      { from: cpuPins[2].pos, to: ram0Pins[2].pos, signal: 'DQ2' },
-      { from: cpuPins[3].pos, to: ram1Pins[0].pos, signal: 'DQ3' },
-      { from: cpuPins[4].pos, to: pciePins[0].pos, signal: 'TX0' },
-      { from: cpuPins[5].pos, to: pciePins[1].pos, signal: 'TX1' },
-    ];
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.set(0, 0.5, 0);
+  controls.update();
 
-    // Generate realistic-looking trace geometry with 45° corners and via markers
-    function createTrace(start, end, color = 0xd4af37) {
-      const points = [];
-      const sx = start.x, sy = start.y, sz = start.z;
-      const ex = end.x, ey = end.y, ez = end.z;
-      // Simple manhattan routing: first move in X, then Z (or vice versa) with a via at corner
-      points.push(new THREE.Vector3(sx, sy, sz));
-      const midY = sy;
-      if (Math.abs(sx - ex) > 0.01) {
-        points.push(new THREE.Vector3(ex, midY, sz)); // horizontal segment
-      }
-      points.push(new THREE.Vector3(ex, ey, ez));
-      const geom = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color }));
-      // Add a small via cylinder at the corner if there is a bend
-      if (points.length === 3) {
-        const via = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.02, 0.02, 0.05, 6),
-          new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3 })
-        );
-        via.position.copy(points[1]);
-        via.position.y -= 0.025;
-        return { line, via };
-      }
-      return { line, via: null };
-    }
+  // Lighting
+  scene.add(new THREE.AmbientLight(0x404066));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(5, 8, 5);
+  dirLight.castShadow = true;
+  dirLight.receiveShadow = true;
+  dirLight.shadow.mapSize.width = 1024;
+  dirLight.shadow.mapSize.height = 1024;
+  scene.add(dirLight);
+  // Ground plane for reference
+  const grid = new THREE.GridHelper(6, 20, 0x333355, 0x222233);
+  scene.add(grid);
 
-    // ---------------- SCENE SETUP ----------------
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a14);
-    scene.fog = new THREE.Fog(0x0a0a14, 5, 25);
-
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 50);
-    camera.position.set(3.5, 2.5, 4.5);
-    camera.lookAt(0, 0.1, 0.2);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.localClippingEnabled = true; // essential for clip plane
-    document.body.appendChild(renderer.domElement);
-
-    const labelRenderer = new CSS2DRenderer();
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
-    labelRenderer.domElement.style.position = 'absolute';
-    labelRenderer.domElement.style.top = '0';
-    labelRenderer.domElement.style.pointerEvents = 'none';
-    document.body.appendChild(labelRenderer.domElement);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.target.set(0, 0.1, 0.2);
-    controls.update();
-
-    // Lighting
-    scene.add(new THREE.AmbientLight(0x404066));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(5, 8, 5);
-    dirLight.castShadow = true;
-    dirLight.receiveShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    scene.add(dirLight);
-
-    // Clipping plane for surgical slicing
-    const clippingPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-    const clipPlanes = [clippingPlane];
-
-    // ---------------- BUILD THE BOARD ----------------
-    // Glass case (with opacity control)
-    const caseMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      roughness: 0.1,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 1.0,
-      clearcoat: 0.5,
-      clippingPlanes: clipPlanes,
-      clipShadows: true,
-    });
-    const caseLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 1.9), caseMat);
-    caseLeft.position.set(-1.3, 0.1, 0.1);
-    const caseRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 1.9), caseMat);
-    caseRight.position.set(1.3, 0.1, 0.1);
-    const caseTop = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 1.9), caseMat);
-    caseTop.position.set(0, 0.8, 0.1);
-    scene.add(caseLeft, caseRight, caseTop);
-
-    // Motherboard base
-    const boardMat = new THREE.MeshStandardMaterial({
-      color: 0x0d2e0d,
-      roughness: 0.7,
-      clippingPlanes: clipPlanes,
-    });
-    const board = new THREE.Mesh(new THREE.BoxGeometry(boardWidth, boardThickness, boardHeight), boardMat);
-    board.position.set(0, -0.5, 0.1);
-    board.receiveShadow = true;
-    scene.add(board);
-
-    // Draw all traces
-    routes.forEach(route => {
-      const { line, via } = createTrace(route.from, route.to, 0xd4af37);
-      line.material.clippingPlanes = clipPlanes;
-      scene.add(line);
-      if (via) {
-        via.material.clippingPlanes = clipPlanes;
-        scene.add(via);
-      }
-    });
-
-    // Component placeholders with realistic shapes and pad arrays
-    function createPad(x,y,z) {
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.02,6),
-        new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness:0.2, clippingPlanes: clipPlanes }));
-      pad.position.set(x,y,z);
-      return pad;
-    }
-    // CPU chip (with visible pads)
-    const cpuGroup = new THREE.Group();
-    const cpuBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a3a, roughness:0.3, clippingPlanes: clipPlanes }));
-    cpuBody.position.set(0, -0.42, 0.2);
-    cpuBody.userData = { component: 'cpu', name: 'Intel i5-13600K' };
-    cpuGroup.add(cpuBody);
-    // CPU pads
-    cpuPins.forEach(pin => {
-      cpuGroup.add(createPad(pin.pos.x, -0.44, pin.pos.z));
-    });
-    scene.add(cpuGroup);
-
-    // RAM sticks
-    const ramGroup0 = new THREE.Group();
-    const stick0 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x2e6b2e, roughness:0.5, clippingPlanes: clipPlanes }));
-    stick0.position.set(-0.7, -0.35, 0.65);
-    stick0.userData = { component: 'ram', name: 'DDR5-6000 16GB' };
-    ramGroup0.add(stick0);
-    ram0Pins.forEach(pin => ramGroup0.add(createPad(pin.pos.x, -0.44, pin.pos.z)));
-    scene.add(ramGroup0);
-
-    const ramGroup1 = new THREE.Group();
-    const stick1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x2e6b2e, roughness:0.5, clippingPlanes: clipPlanes }));
-    stick1.position.set(0.7, -0.35, 0.65);
-    stick1.userData = { component: 'ram', name: 'DDR5-6000 16GB' };
-    ramGroup1.add(stick1);
-    ram1Pins.forEach(pin => ramGroup1.add(createPad(pin.pos.x, -0.44, pin.pos.z)));
-    scene.add(ramGroup1);
-
-    // GPU card (simplified board with fan)
-    const gpuGroup = new THREE.Group();
-    const gpuBoard = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.9),
-      new THREE.MeshStandardMaterial({ color: 0x2a2a40, roughness:0.4, clippingPlanes: clipPlanes }));
-    gpuBoard.position.set(0.5, -0.42, -0.2);
-    gpuBoard.userData = { component: 'gpu', name: 'RTX 4070' };
-    gpuGroup.add(gpuBoard);
-    pciePins.forEach(pin => gpuGroup.add(createPad(pin.pos.x, -0.44, pin.pos.z)));
-    scene.add(gpuGroup);
-
-    // ---------------- CLIP PLANE UI ----------------
-    const clipToggle = document.getElementById('clip-toggle');
-    const clipSlider = document.getElementById('clip-slider');
-    const clipInfo = document.getElementById('clip-info');
-    let clipActive = false;
-    clipToggle.addEventListener('click', () => {
-      clipActive = !clipActive;
-      clipToggle.textContent = clipActive ? '🧠 Clip Plane ON' : '🧠 Clip Plane OFF';
-      clipSlider.disabled = !clipActive;
-      if (!clipActive) {
-        clippingPlane.constant = 0;
-        clipSlider.value = 0;
-        clipInfo.textContent = 'Clip plane at Z = 0.0';
-      }
-    });
-    clipSlider.addEventListener('input', () => {
-      clippingPlane.constant = parseFloat(clipSlider.value);
-      clipInfo.textContent = `Clip plane at Z = ${clippingPlane.constant.toFixed(2)}`;
-    });
-
-    // Case opacity
-    const opacitySlider = document.getElementById('opacity-slider');
-    opacitySlider.addEventListener('input', () => {
-      caseMat.opacity = parseInt(opacitySlider.value) / 100;
-    });
-
-    // Reset view
-    document.getElementById('reset-view').addEventListener('click', () => {
-      camera.position.set(3.5, 2.5, 4.5);
-      controls.target.set(0, 0.1, 0.2);
-      controls.update();
-    });
-
-    // ---------------- COMPONENT INSPECTOR & CODE EXECUTION ----------------
-    const inspector = document.getElementById('inspector');
-    const inspTitle = document.getElementById('inspector-title');
-    const pinCanvas = document.getElementById('pin-diagram');
-    const inspCode = document.getElementById('inspector-code');
-    const stepBtn = document.getElementById('step-btn');
-    const execStatus = document.getElementById('exec-status');
-    let selectedComponent = null;
-    let execState = { pc: 0, registers: [0,0,0,0], memory: [5,3,0,0,0,0,0,0] };
-
-    // Raycaster for component selection
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    renderer.domElement.addEventListener('click', (e) => {
-      mouse.x = (e.clientX / window.innerWidth)*2-1;
-      mouse.y = -(e.clientY / window.innerHeight)*2+1;
-      raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(scene.children, true);
-      for (let hit of hits) {
-        let obj = hit.object;
-        while (obj && !obj.userData.component) obj = obj.parent;
-        if (obj && obj.userData.component) {
-          selectedComponent = obj;
-          const { component, name } = obj.userData;
-          inspTitle.textContent = `${name} (${component.toUpperCase()})`;
-          // Draw internal block diagram
-          const ctx = pinCanvas.getContext('2d');
-          ctx.clearRect(0,0,320,160);
-          ctx.fillStyle='#0d0d20'; ctx.fillRect(0,0,320,160);
-          if (component==='cpu') {
-            ctx.fillStyle='white';
-            ctx.fillText('Fetch → Decode → Execute → Writeback',20,40);
-            ctx.fillText('Memory Controller linked to traces DQ0-DQ3',20,80);
-            inspCode.innerHTML = `<span class="highlight">LOAD R0, [0x1000]</span>  ; Reads from RAM via DQ0`;
-            stepBtn.disabled = false;
-            execState.pc = 0;
-          } else if (component==='ram') {
-            ctx.fillText('DRAM Cell Array (8Gb)',20,40);
-            ctx.fillText('Pins DQ0-DQ11 mapped to CPU bus',20,80);
-            inspCode.textContent = '; Data stored at address 0x1000 = 5';
-            stepBtn.disabled = true;
-          } else if (component==='gpu') {
-            ctx.fillText('Shader Cores, ROPs, TMUs',20,40);
-            inspCode.textContent = 'gl_Position = uMVPMatrix * aPosition;';
-            stepBtn.disabled = true;
-          }
-          inspector.style.display='flex';
-          return;
+  // ---------- PRODUCT MODELS & DATA ----------
+  const productDatabase = {
+    raspberrypi: {
+      name: 'Raspberry Pi 4',
+      parts: ['SoC (Broadcom BCM2711)', 'RAM (4GB LPDDR4)', 'USB-C Power', 'GPIO Header', 'HDMI', 'Ethernet'],
+      connections: ['Power -> SoC', 'SoC -> RAM', 'GPIO -> external'],
+      specs: { voltage: '5V', current: '3A', cores: '4x ARM Cortex-A72' },
+      upgrades: ['8GB RAM kit', 'Heatsink', 'NVMe HAT'],
+      model: (group) => {
+        const board = new THREE.BoxGeometry(0.85, 0.1, 0.55);
+        const mesh = new THREE.Mesh(board, new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.7 }));
+        mesh.position.y = 0.05;
+        group.add(mesh);
+        // SoC chip
+        const soc = new THREE.BoxGeometry(0.2, 0.06, 0.2);
+        const socMesh = new THREE.Mesh(soc, new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 }));
+        socMesh.position.set(0.1, 0.08, 0.1);
+        group.add(socMesh);
+        // GPIO pins
+        for (let i=0; i<12; i++) {
+          const pin = new THREE.CylinderGeometry(0.02,0.02,0.1,6);
+          const pinMesh = new THREE.Mesh(pin, new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+          pinMesh.position.set(-0.35 + i*0.06, 0.1, 0.2);
+          group.add(pinMesh);
         }
       }
-    });
-
-    document.getElementById('close-inspector').onclick = ()=> inspector.style.display='none';
-
-    // Step execution for CPU visualization (lights up a trace)
-    const packetGeom = new THREE.SphereGeometry(0.03, 6,6);
-    const packetMat = new THREE.MeshBasicMaterial({ color: 0x44aaff });
-    const packet = new THREE.Mesh(packetGeom, packetMat);
-    packet.visible = false;
-    scene.add(packet);
-
-    function animatePacket(from, to, callback) {
-      packet.visible = true;
-      packet.position.copy(from);
-      const dur = 600, start = performance.now();
-      const startPos = from.clone();
-      function tick(now) {
-        const t = Math.min((now-start)/dur,1);
-        packet.position.lerpVectors(startPos, to, t);
-        if (t<1) requestAnimationFrame(tick);
-        else { packet.visible=false; if(callback) callback(); }
+    },
+    motor: {
+      name: 'DC Motor 12V',
+      parts: ['Rotor', 'Stator', 'Commutator', 'Brushes', 'Shaft'],
+      connections: ['Battery -> Brushes -> Commutator -> Rotor'],
+      specs: { voltage: '12V', rpm: '3000', torque: '0.5 Nm' },
+      upgrades: ['Brushless motor', 'Encoder'],
+      model: (group) => {
+        const body = new THREE.CylinderGeometry(0.15, 0.15, 0.4, 16);
+        const mesh = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ color: 0x555566, roughness: 0.5 }));
+        mesh.position.y = 0.2;
+        group.add(mesh);
+        const shaft = new THREE.CylinderGeometry(0.03, 0.03, 0.25, 8);
+        const shaftMesh = new THREE.Mesh(shaft, new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+        shaftMesh.position.y = 0.45;
+        group.add(shaftMesh);
       }
-      requestAnimationFrame(tick);
+    },
+    battery: {
+      name: 'Li-ion Battery Pack',
+      parts: ['Cells (3x18650)', 'BMS', 'Connector'],
+      connections: ['Cells -> BMS -> Connector'],
+      specs: { voltage: '11.1V', capacity: '3000mAh' },
+      upgrades: ['Higher capacity cells', 'Fast charging BMS'],
+      model: (group) => {
+        const box = new THREE.BoxGeometry(0.3, 0.2, 0.15);
+        const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.6 }));
+        group.add(mesh);
+      }
+    },
+    gearbox: {
+      name: 'Planetary Gearbox',
+      parts: ['Sun gear', 'Planet gears (3)', 'Ring gear', 'Carrier'],
+      connections: ['Motor shaft -> Sun gear -> Planets -> Carrier'],
+      specs: { ratio: '5:1', material: 'Steel' },
+      upgrades: ['Metal gears', 'Lubrication'],
+      model: (group) => {
+        const ring = new THREE.TorusGeometry(0.18, 0.05, 8, 16);
+        const mesh = new THREE.Mesh(ring, new THREE.MeshStandardMaterial({ color: 0x888888 }));
+        mesh.position.y = 0.15;
+        group.add(mesh);
+      }
+    },
+    drill: {
+      name: 'Electric Drill',
+      parts: ['Motor', 'Battery', 'Trigger', 'Gearbox', 'Chuck'],
+      connections: ['Battery -> Trigger -> Motor -> Gearbox -> Chuck'],
+      specs: { voltage: '18V', rpm: '1500' },
+      upgrades: ['Brushless motor', 'Lithium battery'],
+      model: (group) => {
+        const body = new THREE.BoxGeometry(0.3, 0.25, 0.6);
+        const mesh = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.5 }));
+        group.add(mesh);
+        const handle = new THREE.BoxGeometry(0.15, 0.4, 0.2);
+        const handleMesh = new THREE.Mesh(handle, new THREE.MeshStandardMaterial({ color: 0x222222 }));
+        handleMesh.position.set(0, -0.3, 0.1);
+        group.add(handleMesh);
+      }
+    },
+    frame: {
+      name: 'Drone Frame',
+      parts: ['Arms (4)', 'Center plate', 'Landing gear'],
+      connections: ['Arms -> Center plate'],
+      specs: { material: 'Carbon fiber', weight: '250g' },
+      upgrades: ['Titanium screws', 'Longer arms'],
+      model: (group) => {
+        const center = new THREE.BoxGeometry(0.4, 0.1, 0.4);
+        group.add(new THREE.Mesh(center, new THREE.MeshStandardMaterial({ color: 0x444444 })));
+        for (let i=0; i<4; i++) {
+          const arm = new THREE.BoxGeometry(0.8, 0.05, 0.05);
+          const armMesh = new THREE.Mesh(arm, new THREE.MeshStandardMaterial({ color: 0x222222 }));
+          armMesh.position.x = Math.cos(i*Math.PI/2)*0.4;
+          armMesh.position.z = Math.sin(i*Math.PI/2)*0.4;
+          armMesh.rotation.y = i*Math.PI/2;
+          group.add(armMesh);
+        }
+      }
     }
+  };
 
-    stepBtn.addEventListener('click', ()=>{
-      if (!selectedComponent || selectedComponent.userData.component!=='cpu') return;
-      const state = execState;
-      const instructions = [
-        { type:'LOAD', reg:0, addr:0, from: ram0Pins[0].pos, to: cpuPins[0].pos },
-        { type:'LOAD', reg:1, addr:1, from: ram1Pins[0].pos, to: cpuPins[3].pos },
-        { type:'ADD', reg:0, reg2:1 },
-        { type:'STORE', reg:0, addr:2 },
-        { type:'HALT' }
-      ];
-      if (state.pc >= instructions.length) {
-        execStatus.textContent = 'Program halted.';
-        return;
-      }
-      const instr = instructions[state.pc];
-      if (instr.type==='LOAD' || instr.type==='STORE') {
-        const from = instr.from.clone();
-        const to = instr.to.clone();
-        animatePacket(from, to, ()=>{
-          if (instr.type==='LOAD') state.registers[instr.reg] = state.memory[instr.addr];
-          else state.memory[instr.addr] = state.registers[instr.reg];
-          state.pc++;
-          execStatus.textContent = `Executed: ${instr.type} (R${instr.reg} = ${state.registers[instr.reg]})`;
-          stepBtn.click(); // chain? Not, but manually step again.
-        });
-      } else if (instr.type==='ADD') {
-        state.registers[instr.reg] += state.registers[instr.reg2];
-        state.pc++;
-        execStatus.textContent = `ADD R${instr.reg} = ${state.registers[instr.reg]}`;
-      } else {
-        state.pc++;
-        execStatus.textContent = 'HALT';
-      }
-    });
+  // ---------- OBJECT PLACEMENT ----------
+  let nextId = 1;
+  function addObjectToScene(type, position) {
+    if (!productDatabase[type]) return;
+    const product = productDatabase[type];
+    const group = new THREE.Group();
+    product.model(group);
+    group.position.copy(position);
+    group.userData = { id: nextId, type, product };
+    scene.add(group);
+    const obj = { id: nextId, mesh: group, product: { ...product, type }, position: position.clone() };
+    state.objects.push(obj);
+    nextId++;
+    addLog(`Placed ${product.name} at (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`);
+    saveHistory();
+    return obj;
+  }
 
-    // ---------------- ANIMATION LOOP ----------------
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-      labelRenderer.render(scene, camera);
+  // ---------- HISTORY (UNDO/REDO) ----------
+  function saveHistory() {
+    const snapshot = JSON.stringify(state.objects.map(o => ({ id: o.id, type: o.product.type, pos: [o.position.x, o.position.y, o.position.z] })));
+    if (state.historyIndex < state.history.length - 1) {
+      state.history = state.history.slice(0, state.historyIndex + 1);
     }
-    animate();
-
-    window.addEventListener('resize', ()=>{
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    state.history.push(snapshot);
+    state.historyIndex++;
+    updateUndoRedo();
+  }
+  function undo() {
+    if (state.historyIndex <= 0) return;
+    state.historyIndex--;
+    restoreSnapshot(state.history[state.historyIndex]);
+    updateUndoRedo();
+  }
+  function redo() {
+    if (state.historyIndex >= state.history.length - 1) return;
+    state.historyIndex++;
+    restoreSnapshot(state.history[state.historyIndex]);
+    updateUndoRedo();
+  }
+  function restoreSnapshot(snapshotStr) {
+    const data = JSON.parse(snapshotStr);
+    // Clear existing objects
+    state.objects.forEach(obj => scene.remove(obj.mesh));
+    state.objects = [];
+    data.forEach(item => {
+      const pos = new THREE.Vector3(item.pos[0], item.pos[1], item.pos[2]);
+      addObjectToScene(item.type, pos);
     });
-  </script>
+  }
+  function updateUndoRedo() {
+    document.getElementById('undo-btn').disabled = state.historyIndex <= 0;
+    document.getElementById('redo-btn').disabled = state.historyIndex >= state.history.length - 1;
+  }
+
+  // ---------- LOGGING ----------
+  function addLog(message) {
+    const time = new Date().toLocaleTimeString();
+    state.log.push({ time, message });
+    renderLog();
+  }
+  function renderLog() {
+    const container = document.getElementById('log-container');
+    container.innerHTML = state.log.slice(-5).map(l => `<span class="log-entry"><span class="log-time">${l.time}</span> ${l.message}</span>`).join(' ');
+  }
+
+  // ---------- DRAG AND DROP FROM LIBRARY ----------
+  const libraryItems = document.querySelectorAll('.library-item');
+  let draggedType = null;
+  let draggedName = null;
+  let ghostEl = null;
+
+  libraryItems.forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      draggedType = item.dataset.type;
+      draggedName = item.dataset.name;
+      e.dataTransfer.setData('text/plain', draggedType);
+      item.classList.add('dragging-source');
+      // Create custom ghost
+      ghostEl = document.createElement('div');
+      ghostEl.className = 'drag-ghost';
+      ghostEl.textContent = draggedName;
+      document.body.appendChild(ghostEl);
+      e.dataTransfer.setDragImage(ghostEl, 50, 20);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging-source');
+      if (ghostEl) { document.body.removeChild(ghostEl); ghostEl = null; }
+      draggedType = null;
+    });
+  });
+
+  workspace.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  workspace.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!draggedType) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(mouseX, mouseY);
+    raycaster.setFromCamera(mouse, camera);
+    // Intersect with a ground plane at y=0
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const point = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, point);
+    if (point) {
+      const obj = addObjectToScene(draggedType, point);
+      addLog(`Dragged ${draggedName} into workspace.`);
+    }
+  });
+
+  // ---------- INSPECTOR LOGIC ----------
+  const inspectorPanel = document.getElementById('inspector-panel');
+  const inspTitle = document.getElementById('inspector-title');
+  const inspContent = document.getElementById('inspector-content');
+  const closeInspector = document.getElementById('close-inspector');
+  const inspectorTabs = document.querySelectorAll('.inspector-tab');
+  let activeTab = 'overview';
+  let inspectedObj = null;
+
+  function showInspector(obj) {
+    inspectedObj = obj;
+    inspectorPanel.classList.remove('hidden');
+    inspTitle.textContent = obj.product.name;
+    activeTab = 'overview';
+    document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('.inspector-tab[data-tab="overview"]').classList.add('active');
+    renderInspectorContent();
+  }
+  function renderInspectorContent() {
+    if (!inspectedObj) return;
+    const prod = inspectedObj.product;
+    let html = '';
+    switch (activeTab) {
+      case 'overview':
+        html = `<p><strong>Type:</strong> ${prod.type}</p><p>${prod.specs && Object.entries(prod.specs).map(([k,v])=>`<strong>${k}:</strong> ${v}`).join('<br>')}</p>`;
+        break;
+      case 'parts':
+        html = `<ul>${prod.parts.map(p => `<li>${p}</li>`).join('')}</ul>`;
+        break;
+      case 'connections':
+        html = `<ul>${prod.connections.map(c => `<li>${c}</li>`).join('')}</ul>`;
+        break;
+      case 'specs':
+        html = `<pre>${JSON.stringify(prod.specs, null, 2)}</pre>`;
+        break;
+      case 'upgrades':
+        html = `<ul>${prod.upgrades.map(u => `<li>✅ ${u}</li>`).join('')}</ul>`;
+        break;
+    }
+    inspContent.innerHTML = html;
+  }
+  inspectorTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeTab = tab.dataset.tab;
+      document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderInspectorContent();
+    });
+  });
+  closeInspector.addEventListener('click', () => {
+    inspectorPanel.classList.add('hidden');
+    inspectedObj = null;
+  });
+
+  // ---------- CLICK SELECTION IN WORKSPACE ----------
+  renderer.domElement.addEventListener('click', (e) => {
+    if (e.detail > 1) return; // ignore double
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(state.objects.map(o => o.mesh), true);
+    if (intersects.length > 0) {
+      let obj = intersects[0].object;
+      while (obj && !obj.userData.id) obj = obj.parent;
+      if (obj && obj.userData.id) {
+        const found = state.objects.find(o => o.id === obj.userData.id);
+        if (found) {
+          showInspector(found);
+          addLog(`Inspecting ${found.product.name}`);
+        }
+      }
+    }
+  });
+
+  // ---------- MODE SWITCHING ----------
+  const modeButtons = {
+    inspect: document.getElementById('mode-inspect'),
+    move: document.getElementById('mode-move'),
+    connect: document.getElementById('mode-connect'),
+    explode: document.getElementById('mode-explode')
+  };
+  function setMode(mode) {
+    state.mode = mode;
+    Object.keys(modeButtons).forEach(m => modeButtons[m].classList.remove('active'));
+    modeButtons[mode].classList.add('active');
+    controls.enableRotate = mode !== 'connect'; // simple example
+    addLog(`Mode: ${mode}`);
+  }
+  modeButtons.inspect.addEventListener('click', () => setMode('inspect'));
+  modeButtons.move.addEventListener('click', () => setMode('move'));
+  modeButtons.connect.addEventListener('click', () => setMode('connect'));
+  modeButtons.explode.addEventListener('click', () => setMode('explode'));
+  setMode('inspect');
+
+  // ---------- IMPORT MANUAL (FAKE) ----------
+  document.getElementById('import-manual').addEventListener('click', () => {
+    addLog('Importing manual for Electric Drill...');
+    // Simulate extraction and build
+    const pos = new THREE.Vector3(1, 0, 1);
+    const drill = addObjectToScene('drill', pos);
+    addLog('AI extracted parts: Motor, Battery, Trigger, Gearbox, Chuck');
+    addLog('Built digital twin of Electric Drill.');
+    showInspector(drill);
+  });
+
+  // ---------- UNDO/REDO BUTTONS ----------
+  document.getElementById('undo-btn').addEventListener('click', undo);
+  document.getElementById('redo-btn').addEventListener('click', redo);
+
+  // ---------- ANIMATION LOOP ----------
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    camera.aspect = workspace.clientWidth / workspace.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(workspace.clientWidth, workspace.clientHeight);
+  });
+
+  // Initial history snapshot
+  saveHistory();
+  addLog('ReverseLab ready. Drag components from library or import a manual.');
+</script>
 </body>
 </html>
