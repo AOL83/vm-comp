@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Stickman PC – Visual Hardware with Live Code Inspection</title>
+  <title>Surgeon‑Level PC Inspector – Transparent Case, Circuit Detail, Code Correlation</title>
   <style>
     body {
       margin: 0;
@@ -11,7 +11,7 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #0a0a14;
     }
-    /* Navbar */
+    /* ---- Navbar ---- */
     #navbar {
       position: fixed;
       top: 0;
@@ -20,88 +20,82 @@
       background: rgba(10, 10, 20, 0.92);
       backdrop-filter: blur(12px);
       display: flex;
-      justify-content: center;
-      gap: 1.5rem;
-      padding: 0.8rem 1.5rem;
-      z-index: 20;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 0.7rem 1.5rem;
+      z-index: 30;
       border-bottom: 1px solid rgba(255,255,255,0.12);
     }
-    .nav-btn {
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.3);
+    .nav-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       color: #ccc;
-      padding: 0.6rem 1.8rem;
-      border-radius: 30px;
-      font-size: 1rem;
-      font-weight: 500;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      transition: all 0.3s;
-      text-transform: uppercase;
+      font-size: 0.9rem;
     }
-    .nav-btn:hover {
+    .nav-btn {
       background: rgba(255,255,255,0.1);
-      border-color: #fff;
-      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #ddd;
+      padding: 0.4rem 1.2rem;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: 0.2s;
+      font-weight: 500;
     }
     .nav-btn.active {
       background: #4a90e2;
       border-color: #4a90e2;
       color: white;
-      box-shadow: 0 0 15px #4a90e2aa;
     }
-    /* Code panel – hidden by default, shown in Metaphysical view */
-    #code-panel {
+    input[type=range] {
+      width: 100px;
+    }
+    /* ---- Inspection Panel (right side) ---- */
+    #inspect-panel {
       position: fixed;
-      right: 25px;
+      right: 20px;
       top: 120px;
-      width: 320px;
+      width: 360px;
+      max-height: 70vh;
       background: rgba(15, 15, 30, 0.95);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 16px;
+      backdrop-filter: blur(15px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 20px;
       padding: 20px;
       color: #ddd;
       font-size: 0.9rem;
-      z-index: 15;
+      z-index: 25;
       display: none;
       flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.7);
+      gap: 15px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.7);
+      overflow-y: auto;
     }
-    #code-panel h3 {
-      margin: 0 0 5px 0;
+    #inspect-panel h2 {
+      margin: 0;
       color: #8ab4f8;
-      font-weight: 600;
     }
-    .program-listing {
+    canvas.block-diagram {
+      width: 100%;
+      height: 140px;
       background: #1a1a2e;
       border-radius: 8px;
-      padding: 12px;
+    }
+    .code-snippet {
+      background: #111122;
+      border-radius: 8px;
+      padding: 10px;
       font-family: 'Courier New', monospace;
-      font-size: 0.85rem;
-      line-height: 1.7;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
     }
-    .instr {
-      padding: 2px 6px;
-      border-radius: 4px;
-      transition: background 0.2s;
-    }
-    .instr.active {
+    .highlight {
       background: #4a90e2;
       color: white;
-      font-weight: bold;
-    }
-    .registers {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .reg {
-      background: #2a2a3e;
-      border-radius: 6px;
-      padding: 4px 12px;
-      font-family: monospace;
+      padding: 0 4px;
+      border-radius: 3px;
     }
     button {
       background: #4a90e2;
@@ -111,62 +105,57 @@
       border-radius: 6px;
       font-weight: 600;
       cursor: pointer;
-      margin-right: 6px;
       transition: 0.2s;
     }
-    button:disabled {
-      background: #555;
-      cursor: not-allowed;
-    }
-    button:hover:not(:disabled) {
+    button:hover {
       background: #6aa8ff;
     }
-    #info-panel {
-      position: fixed;
-      bottom: 30px;
-      left: 30px;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(8px);
-      color: #ccc;
-      padding: 1rem 1.5rem;
-      border-radius: 12px;
-      max-width: 340px;
-      font-size: 0.9rem;
-      border-left: 4px solid #4a90e2;
-      transition: opacity 0.3s;
-      z-index: 15;
+    #close-panel {
+      align-self: flex-end;
+      background: transparent;
+      border: 1px solid #aaa;
+      color: #aaa;
+      padding: 4px 10px;
     }
-    @media (max-width: 700px) {
-      #navbar { gap: 0.5rem; padding: 0.5rem; }
-      .nav-btn { padding: 0.4rem 1rem; font-size: 0.8rem; }
-      #code-panel { width: 260px; right: 10px; }
+    #info-hint {
+      position: fixed;
+      bottom: 25px;
+      left: 25px;
+      color: #aaa;
+      background: rgba(0,0,0,0.6);
+      padding: 6px 14px;
+      border-radius: 8px;
+      z-index: 20;
+      font-size: 0.85rem;
     }
   </style>
 </head>
 <body>
   <div id="navbar">
-    <button id="btn-skin" class="nav-btn active">Skin</button>
-    <button id="btn-framework" class="nav-btn">Framework</button>
-    <button id="btn-metaphysical" class="nav-btn">Metaphysical (Code)</button>
-    <button id="btn-overview" class="nav-btn">System Overview</button>
-  </div>
-
-  <div id="code-panel">
-    <h3>🧠 CPU Execution</h3>
-    <div class="program-listing" id="program-text"></div>
-    <div class="registers" id="registers-display"></div>
-    <div style="display:flex; gap:6px; margin-top:6px;">
-      <button id="step-btn">Step</button>
-      <button id="run-btn">▶ Run</button>
-      <button id="reset-btn">↺ Reset</button>
+    <div class="nav-group">
+      <span>🔍 Case</span>
+      <input type="range" id="opacity-slider" min="0" max="100" value="90" step="1">
+      <span id="opacity-val">90%</span>
     </div>
-    <div style="font-size:0.8rem; color:#aaa;" id="status-msg">Ready. Program: compute 5 + 3</div>
+    <div class="nav-group">
+      <button id="clip-toggle" class="nav-btn">🧠 Clip Plane OFF</button>
+      <input type="range" id="clip-slider" min="-1.5" max="1.5" value="0" step="0.01" disabled>
+    </div>
+    <div class="nav-group">
+      <button id="reset-view" class="nav-btn">↺ Reset View</button>
+    </div>
   </div>
 
-  <div id="info-panel">
-    <strong>Skin (Case)</strong><br>
-    Outer enclosure. Protects and houses all components.
+  <div id="inspect-panel">
+    <button id="close-panel">✕ Close</button>
+    <h2 id="part-name">Component</h2>
+    <canvas id="block-diagram" class="block-diagram" width="320" height="140"></canvas>
+    <div><strong>Code Interaction:</strong></div>
+    <div id="code-snippet" class="code-snippet">; select a component</div>
+    <button id="simulate-btn">▶ Simulate Data Flow</button>
   </div>
+
+  <div id="info-hint">🖱️ Click on a component (CPU, GPU, RAM, Chipset) to inspect</div>
 
   <script type="importmap">
     {
@@ -182,7 +171,7 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-    // -------------------- SCENE SETUP --------------------
+    // -------------------- SCENE --------------------
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a14);
     scene.fog = new THREE.Fog(0x0a0a14, 5, 25);
@@ -196,6 +185,7 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.localClippingEnabled = true; // critical for clipping
     document.body.appendChild(renderer.domElement);
 
     const labelRenderer = new CSS2DRenderer();
@@ -224,73 +214,143 @@
     scene.add(dirLight);
     scene.add(new THREE.PointLight(0x335577, 0.8));
 
-    // Groups
-    const skinGroup = new THREE.Group();
-    const frameworkGroup = new THREE.Group();
-    const metaGroup = new THREE.Group(); // for execution visuals
-    const allComponents = new THREE.Group();
-    scene.add(skinGroup, frameworkGroup, metaGroup, allComponents);
+    // ---- Materials (with clipping enabled) ----
+    const clippingPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0); // initial Z=0
+    const clipPlanes = [clippingPlane];
 
-    // -------------------- BUILD 3D MODEL --------------------
-    // Chassis (always visible base)
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 2.0),
-      new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.6, metalness: 0.4 }));
-    chassis.position.y = 0;
-    chassis.castShadow = chassis.receiveShadow = true;
-    allComponents.add(chassis);
-    const frontPanel = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0x1e1e2e, roughness: 0.3, metalness: 0.7 }));
-    frontPanel.position.set(0, 0, 1.0);
-    allComponents.add(frontPanel);
-
-    // SKIN (case panels)
-    const panelMat = new THREE.MeshStandardMaterial({ color: 0x3a3a4a, roughness: 0.25, metalness: 0.8, transparent: true, opacity: 0.9 });
-    const leftPanel = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.3, 1.9), panelMat);
-    leftPanel.position.set(-1.15, 0.05, 0);
-    skinGroup.add(leftPanel);
-    const rightPanel = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.3, 1.9), panelMat);
-    rightPanel.position.set(1.15, 0.05, 0);
-    skinGroup.add(rightPanel);
-    const topPanel = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.1, 1.9), panelMat);
-    topPanel.position.set(0, 0.75, 0);
-    skinGroup.add(topPanel);
-    const frontCover = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x4a4a5a, roughness: 0.2, metalness: 0.9 }));
-    frontCover.position.set(0, 0, 1.05);
-    skinGroup.add(frontCover);
-
-    // FRAMEWORK (motherboard + components)
-    const board = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.08, 1.6),
-      new THREE.MeshStandardMaterial({ color: 0x1a472a, roughness: 0.7, metalness: 0.2 }));
-    board.position.set(0, -0.3, -0.1);
-    frameworkGroup.add(board);
-    const cpu = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0xc0c0e0, roughness: 0.2, metalness: 0.9, emissive: new THREE.Color(0x111133) }));
-    cpu.position.set(0, -0.2, 0.2);
-    frameworkGroup.add(cpu);
-    const gpu = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 1.1),
-      new THREE.MeshStandardMaterial({ color: 0x2a2a40, roughness: 0.3, metalness: 0.8 }));
-    gpu.position.set(0.5, -0.45, -0.1);
-    gpu.rotation.x = -0.1;
-    frameworkGroup.add(gpu);
-    for (let i = -0.6; i <= 0.6; i+=1.2) {
-      const ramStick = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.25, 0.06),
-        new THREE.MeshStandardMaterial({ color: 0x2e6b2e, roughness: 0.5, metalness: 0.3 }));
-      ramStick.position.set(i, -0.15, 0.65);
-      frameworkGroup.add(ramStick);
+    function createClippedMaterial(color, opts = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: opts.roughness !== undefined ? opts.roughness : 0.5,
+        metalness: opts.metalness !== undefined ? opts.metalness : 0.3,
+        clippingPlanes: clipPlanes,
+        clipShadows: true,
+        ...opts
+      });
     }
-    const cooler = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.25, 0.55),
-      new THREE.MeshStandardMaterial({ color: 0x888899, roughness: 0.4, metalness: 0.7 }));
-    cooler.position.set(0, -0.05, 0.2);
-    frameworkGroup.add(cooler);
 
-    // Labels for components
-    function createLabel(text, pos, color='#fff') {
+    // ---- GROUPS ----
+    const skinGroup = new THREE.Group();
+    const boardGroup = new THREE.Group();
+    const componentsGroup = new THREE.Group();
+    scene.add(skinGroup, boardGroup, componentsGroup);
+
+    // ---- CASE (SKIN) with transparent material ----
+    const caseMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3a4a,
+      roughness: 0.2,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.9,
+      clippingPlanes: clipPlanes,
+      clipShadows: true,
+    });
+    const sideLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 1.9), caseMat);
+    sideLeft.position.set(-1.16, 0.05, 0);
+    skinGroup.add(sideLeft);
+    const sideRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 1.9), caseMat);
+    sideRight.position.set(1.16, 0.05, 0);
+    skinGroup.add(sideRight);
+    const topCase = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.1, 1.9), caseMat);
+    topCase.position.set(0, 0.75, 0);
+    skinGroup.add(topCase);
+    const frontBezel = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 0.05), caseMat);
+    frontBezel.position.set(0, 0, 1.05);
+    skinGroup.add(frontBezel);
+
+    // ---- MOTHERBOARD with circuit traces ----
+    const boardBase = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.1, 1.6),
+      createClippedMaterial(0x0d2e0d, { roughness: 0.8, metalness: 0.1 }));
+    boardBase.position.set(0, -0.35, -0.1);
+    boardGroup.add(boardBase);
+
+    // Copper traces (many thin lines)
+    const traceMat = new THREE.LineBasicMaterial({ color: 0xd4af37, clippingPlanes: clipPlanes });
+    const tracePoints = [];
+    for (let i = 0; i < 40; i++) {
+      const x1 = (Math.random() - 0.5) * 1.7;
+      const z1 = (Math.random() - 0.5) * 1.4 - 0.1;
+      const x2 = x1 + (Math.random() - 0.5) * 0.5;
+      const z2 = z1 + (Math.random() - 0.5) * 0.5;
+      const y = -0.29;
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x1, y, z1), new THREE.Vector3(x2, y, z2)
+      ]);
+      boardGroup.add(new THREE.Line(geom, traceMat));
+    }
+
+    // ---- DETAILED COMPONENTS ----
+    // CPU socket with pins
+    const cpuSocket = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.1, 0.55),
+      createClippedMaterial(0x888888, { roughness: 0.3, metalness: 0.9 }));
+    cpuSocket.position.set(0, -0.28, 0.2);
+    componentsGroup.add(cpuSocket);
+    // Pins (small cylinders)
+    for (let xi = -0.2; xi <= 0.2; xi += 0.1) {
+      for (let zi = 0.0; zi <= 0.4; zi += 0.1) {
+        const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.07, 6),
+          createClippedMaterial(0xffd700, { roughness: 0.1, metalness: 1 }));
+        pin.position.set(xi, -0.24, 0.2 + zi - 0.2);
+        componentsGroup.add(pin);
+      }
+    }
+    const cpuChip = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.08, 0.45),
+      createClippedMaterial(0x1a1a3a, { roughness: 0.1, metalness: 0.9, emissive: new THREE.Color(0x000022) }));
+    cpuChip.position.set(0, -0.21, 0.2);
+    cpuChip.userData = { component: 'cpu' };
+    componentsGroup.add(cpuChip);
+
+    // GPU
+    const gpuBoard = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 1.1),
+      createClippedMaterial(0x2a2a40, { roughness: 0.4, metalness: 0.8 }));
+    gpuBoard.position.set(0.5, -0.5, -0.1);
+    gpuBoard.userData = { component: 'gpu' };
+    componentsGroup.add(gpuBoard);
+    // GPU fan
+    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.08, 16),
+      createClippedMaterial(0x333344, { roughness: 0.3, metalness: 0.7 }));
+    fan.position.set(0.5, -0.42, -0.1);
+    componentsGroup.add(fan);
+
+    // RAM sticks with chips
+    for (let i = -0.6; i <= 0.6; i+=1.2) {
+      const stick = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.06),
+        createClippedMaterial(0x2e6b2e, { roughness: 0.5 }));
+      stick.position.set(i, -0.12, 0.68);
+      stick.userData = { component: 'ram', index: i };
+      componentsGroup.add(stick);
+      // RAM chips on stick
+      for (let j = -0.1; j <= 0.1; j+=0.1) {
+        const chip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.04),
+          createClippedMaterial(0x111111, { roughness: 0.2 }));
+        chip.position.set(i, -0.12 + j, 0.71);
+        componentsGroup.add(chip);
+      }
+    }
+
+    // Chipset (southbridge)
+    const chipset = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.4),
+      createClippedMaterial(0x444466, { roughness: 0.3, metalness: 0.6 }));
+    chipset.position.set(-0.5, -0.45, -0.4);
+    chipset.userData = { component: 'chipset' };
+    componentsGroup.add(chipset);
+
+    // Capacitors
+    for (let k = 0; k < 8; k++) {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.15, 8),
+        createClippedMaterial(0x222222, { roughness: 0.2 }));
+      cap.position.set(-0.7 + k * 0.2, -0.28, -0.7);
+      componentsGroup.add(cap);
+    }
+
+    // ---- LABELS ----
+    function makeLabel(text, pos, color='#fff') {
       const div = document.createElement('div');
       div.textContent = text;
       div.style.color = color;
+      div.style.fontSize = '12px';
       div.style.fontWeight = 'bold';
-      div.style.background = 'rgba(20,20,30,0.8)';
+      div.style.background = 'rgba(0,0,0,0.7)';
       div.style.padding = '2px 8px';
       div.style.borderRadius = '4px';
       const lbl = new CSS2DObject(div);
@@ -298,287 +358,190 @@
       return lbl;
     }
     const labelGroup = new THREE.Group();
-    labelGroup.add(createLabel('CPU', new THREE.Vector3(0, 0.1, 0.2), '#aaccff'));
-    labelGroup.add(createLabel('GPU', new THREE.Vector3(0.5, -0.3, -0.1), '#ccaa88'));
-    labelGroup.add(createLabel('RAM', new THREE.Vector3(-0.6, 0.0, 0.75), '#88cc88'));
-    frameworkGroup.add(labelGroup);
+    labelGroup.add(makeLabel('CPU', new THREE.Vector3(0, 0.0, 0.2), '#aaccff'));
+    labelGroup.add(makeLabel('GPU', new THREE.Vector3(0.5, -0.3, -0.1), '#ccaa88'));
+    labelGroup.add(makeLabel('RAM', new THREE.Vector3(-0.6, 0.1, 0.75), '#88cc88'));
+    labelGroup.add(makeLabel('Chipset', new THREE.Vector3(-0.5, -0.3, -0.4), '#cc88cc'));
+    componentsGroup.add(labelGroup);
 
-    // MEMORY VISUALIZATION (8 cells near RAM)
-    const memCells = [];
-    const memValues = [5, 3, 0, 0, 0, 0, 0, 0]; // initial program data
-    const cellGroup = new THREE.Group();
-    for (let i = 0; i < 8; i++) {
-      const cellGeo = new THREE.BoxGeometry(0.12, 0.05, 0.12);
-      const cellMat = new THREE.MeshStandardMaterial({ color: 0x335533, roughness: 0.6 });
-      const cell = new THREE.Mesh(cellGeo, cellMat);
-      cell.position.set(-0.7 + i * 0.2, 0.05, 0.82);
-      cell.userData = { address: i };
-      cellGroup.add(cell);
-      // value label
-      const valDiv = document.createElement('div');
-      valDiv.style.color = '#cfc';
-      valDiv.style.fontSize = '10px';
-      valDiv.style.background = 'rgba(0,0,0,0.7)';
-      valDiv.style.padding = '1px 4px';
-      const valLabel = new CSS2DObject(valDiv);
-      valLabel.position.copy(cell.position.clone().add(new THREE.Vector3(0, 0.1, 0)));
-      cellGroup.add(valLabel);
-      memCells.push({ mesh: cell, label: valLabel, value: memValues[i] });
-    }
-    metaGroup.add(cellGroup);
+    // ---- CLIP PLANE VISUALIZATION (optional) ----
+    const clipPlaneHelper = new THREE.PlaneHelper(clippingPlane, 2, 0xff0000);
+    clipPlaneHelper.visible = false;
+    scene.add(clipPlaneHelper);
 
-    // CPU register visual labels (CSS2D objects near CPU)
-    const regLabels = [];
-    const regNames = ['R0', 'R1', 'R2', 'R3'];
-    const regPositions = [
-      new THREE.Vector3(-0.2, 0.05, 0.5),
-      new THREE.Vector3(0.2, 0.05, 0.5),
-      new THREE.Vector3(-0.2, -0.1, 0.5),
-      new THREE.Vector3(0.2, -0.1, 0.5)
-    ];
-    regNames.forEach((name, idx) => {
-      const div = document.createElement('div');
-      div.style.color = '#aad';
-      div.style.fontWeight = 'bold';
-      div.style.background = 'rgba(0,0,30,0.8)';
-      div.style.padding = '2px 6px';
-      div.style.borderRadius = '4px';
-      div.textContent = `${name}: 0`;
-      const lbl = new CSS2DObject(div);
-      lbl.position.copy(regPositions[idx]);
-      metaGroup.add(lbl);
-      regLabels.push({ name, label: lbl, value: 0 });
+    // ---- DATA FLOW PACKET (for simulation) ----
+    const packet = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0x44aaff }));
+    packet.visible = false;
+    scene.add(packet);
+
+    // ---- UI STATE ----
+    const opacitySlider = document.getElementById('opacity-slider');
+    const opacityVal = document.getElementById('opacity-val');
+    caseMat.opacity = 0.9;
+    opacitySlider.addEventListener('input', () => {
+      const val = parseInt(opacitySlider.value) / 100;
+      caseMat.opacity = val;
+      opacityVal.textContent = Math.round(val*100) + '%';
     });
 
-    // Animated packet (glowing sphere)
-    const packetGeo = new THREE.SphereGeometry(0.07, 16, 16);
-    const packetMat = new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.9 });
-    const packet = new THREE.Mesh(packetGeo, packetMat);
-    packet.visible = false;
-    metaGroup.add(packet);
+    const clipToggle = document.getElementById('clip-toggle');
+    const clipSlider = document.getElementById('clip-slider');
+    let clippingActive = false;
+    clipToggle.addEventListener('click', () => {
+      clippingActive = !clippingActive;
+      clipToggle.textContent = clippingActive ? '🧠 Clip Plane ON' : '🧠 Clip Plane OFF';
+      clipToggle.classList.toggle('active', clippingActive);
+      clipSlider.disabled = !clippingActive;
+      clipPlaneHelper.visible = clippingActive;
+      if (!clippingActive) {
+        clippingPlane.constant = 0;
+        clipSlider.value = 0;
+      }
+    });
+    clipSlider.addEventListener('input', () => {
+      clippingPlane.constant = parseFloat(clipSlider.value);
+    });
 
-    // -------------------- CPU SIMULATOR --------------------
-    const program = [
-      { instr: 'LOAD', args: [0, 0], desc: 'R0 ← mem[0]', text: 'LOAD R0, [0]' },
-      { instr: 'LOAD', args: [1, 1], desc: 'R1 ← mem[1]', text: 'LOAD R1, [1]' },
-      { instr: 'ADD',  args: [0, 1], desc: 'R0 ← R0 + R1', text: 'ADD R0, R1' },
-      { instr: 'STORE',args: [0, 2], desc: 'mem[2] ← R0', text: 'STORE R0, [2]' },
-      { instr: 'HALT', args: [], desc: 'Stop', text: 'HALT' }
-    ];
-    let registers = [0, 0, 0, 0];
-    let memory = [5, 3, 0, 0, 0, 0, 0, 0];
-    let pc = 0;
-    let halted = false;
-    let animating = false;
+    document.getElementById('reset-view').addEventListener('click', () => {
+      camera.position.set(5, 3.5, 7);
+      controls.target.set(0, 0.15, 0);
+      controls.update();
+    });
 
-    // Update visual memory cells and register labels
-    function updateMemoryVisuals() {
-      memCells.forEach((cell, i) => {
-        cell.value = memory[i];
-        cell.label.element.textContent = memory[i];
-        cell.mesh.material.color.set(memory[i] !== 0 ? 0x44aa44 : 0x335533);
-      });
-    }
-    function updateRegisterVisuals() {
-      regLabels.forEach((reg, i) => {
-        reg.value = registers[i];
-        reg.label.element.textContent = `${reg.name}: ${registers[i]}`;
-      });
-    }
-    function updatePanel() {
-      const listing = document.getElementById('program-text');
-      listing.innerHTML = program.map((p, idx) => 
-        `<div class="instr${idx === pc ? ' active' : ''}">${p.text}</div>`
-      ).join('');
-      document.getElementById('registers-display').innerHTML = 
-        registers.map((v,i) => `<span class="reg">R${i}: ${v}</span>`).join('');
-      document.getElementById('status-msg').textContent = halted ? 'Program halted.' : 'Ready.';
-    }
+    // ---- INSPECTION PANEL LOGIC ----
+    const inspectPanel = document.getElementById('inspect-panel');
+    const partName = document.getElementById('part-name');
+    const blockCanvas = document.getElementById('block-diagram');
+    const codeSnippet = document.getElementById('code-snippet');
+    const simulateBtn = document.getElementById('simulate-btn');
+    const closePanel = document.getElementById('close-panel');
+    let selectedComponent = null;
 
-    function resetCPU() {
-      pc = 0;
-      halted = false;
-      registers = [0,0,0,0];
-      memory = [5,3,0,0,0,0,0,0];
-      updateMemoryVisuals();
-      updateRegisterVisuals();
-      updatePanel();
-      packet.visible = false;
-    }
+    closePanel.addEventListener('click', () => {
+      inspectPanel.style.display = 'none';
+      selectedComponent = null;
+    });
 
-    // Animation helpers
-    function animatePacket(from, to, duration, onComplete) {
-      if (animating) return;
-      animating = true;
-      packet.visible = true;
-      packet.position.copy(from);
-      const startTime = performance.now();
-      const startPos = from.clone();
-      function tick(now) {
-        const elapsed = now - startTime;
-        const t = Math.min(elapsed / duration, 1.0);
-        packet.position.lerpVectors(startPos, to, t);
-        if (t < 1) {
-          requestAnimationFrame(tick);
-        } else {
-          packet.visible = false;
-          animating = false;
-          if (onComplete) onComplete();
+    // Draw block diagram on canvas for each component
+    function drawBlockDiagram(type) {
+      const ctx = blockCanvas.getContext('2d');
+      ctx.clearRect(0, 0, blockCanvas.width, blockCanvas.height);
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(0, 0, blockCanvas.width, blockCanvas.height);
+      ctx.strokeStyle = '#4a90e2';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '12px sans-serif';
+      if (type === 'cpu') {
+        ctx.fillText('Fetch → Decode → Execute → Writeback', 20, 40);
+        ctx.strokeRect(15, 20, 60, 30);
+        ctx.strokeRect(85, 20, 60, 30);
+        ctx.strokeRect(155, 20, 70, 30);
+        ctx.strokeRect(235, 20, 75, 30);
+        ctx.fillText('ALU', 180, 80);
+      } else if (type === 'gpu') {
+        ctx.fillText('Shader Cores (16)', 20, 30);
+        ctx.fillText('TMU  |  ROP', 20, 60);
+        ctx.strokeRect(10, 40, 140, 30);
+      } else if (type === 'ram') {
+        for (let r = 0; r < 4; r++) {
+          for (let c = 0; c < 8; c++) {
+            ctx.strokeRect(10 + c*25, 30 + r*20, 20, 15);
+          }
         }
-      }
-      requestAnimationFrame(tick);
-    }
-
-    function stepExecution() {
-      if (animating || halted) return;
-      const instr = program[pc];
-      if (!instr) return;
-
-      if (instr.instr === 'LOAD') {
-        const [regIdx, addr] = instr.args;
-        const srcCell = memCells[addr].mesh;
-        const fromPos = srcCell.position.clone();
-        const toPos = regPositions[regIdx].clone();
-        animatePacket(fromPos, toPos, 600, () => {
-          registers[regIdx] = memory[addr];
-          updateRegisterVisuals();
-          pc++;
-          updatePanel();
-          if (pc >= program.length || program[pc].instr === 'HALT') {
-            halted = true;
-            updatePanel();
-          }
-        });
-      } else if (instr.instr === 'ADD') {
-        const [r1, r2] = instr.args;
-        registers[r1] += registers[r2];
-        updateRegisterVisuals();
-        pc++;
-        updatePanel();
-        if (pc >= program.length || program[pc].instr === 'HALT') halted = true;
-      } else if (instr.instr === 'STORE') {
-        const [regIdx, addr] = instr.args;
-        const fromPos = regPositions[regIdx].clone();
-        const toCell = memCells[addr].mesh;
-        const toPos = toCell.position.clone();
-        animatePacket(fromPos, toPos, 600, () => {
-          memory[addr] = registers[regIdx];
-          updateMemoryVisuals();
-          pc++;
-          updatePanel();
-          if (pc >= program.length || program[pc].instr === 'HALT') halted = true;
-        });
-      } else if (instr.instr === 'HALT') {
-        halted = true;
-        updatePanel();
+        ctx.fillText('DRAM Cell Array', 20, 110);
+      } else if (type === 'chipset') {
+        ctx.fillText('PCIe Bridge | USB | SATA', 20, 40);
+        ctx.strokeRect(10, 25, 280, 30);
       }
     }
 
-    // UI controls
-    document.getElementById('step-btn').addEventListener('click', stepExecution);
-    let autoRunInterval = null;
-    document.getElementById('run-btn').addEventListener('click', () => {
-      if (autoRunInterval) {
-        clearInterval(autoRunInterval);
-        autoRunInterval = null;
-        document.getElementById('run-btn').textContent = '▶ Run';
-        return;
+    function setCodeSnippet(type) {
+      if (type === 'cpu') {
+        codeSnippet.innerHTML = `<span class="highlight">ADD R0, R1</span>  ; currently executing<br>MOV R2, R0<br>STORE R2, [0xFF]`;
+      } else if (type === 'gpu') {
+        codeSnippet.innerHTML = `gl_Position = uMVPMatrix * vec4(aPosition,1.0);<br>fragColor = texture(uSampler, vTexCoord);`;
+      } else if (type === 'ram') {
+        codeSnippet.innerHTML = `int* ptr = malloc(64);<br>ptr[0] = 5;  // stored at 0x1000`;
+      } else if (type === 'chipset') {
+        codeSnippet.innerHTML = `// DMA transfer from disk to RAM<br>memcpy(buf, disk_sector, 512);`;
       }
-      document.getElementById('run-btn').textContent = '⏸ Pause';
-      autoRunInterval = setInterval(() => {
-        if (halted || animating) {
-          if (halted) {
-            clearInterval(autoRunInterval);
-            autoRunInterval = null;
-            document.getElementById('run-btn').textContent = '▶ Run';
-          }
+    }
+
+    // Animate data flow
+    let animId = null;
+    function animatePacketPath(positions, callback) {
+      if (animId) cancelAnimationFrame(animId);
+      packet.visible = true;
+      let idx = 0;
+      const duration = 600;
+      function step() {
+        if (idx >= positions.length - 1) {
+          packet.visible = false;
+          if (callback) callback();
           return;
         }
-        stepExecution();
-      }, 800);
-    });
-    document.getElementById('reset-btn').addEventListener('click', () => {
-      if (autoRunInterval) {
-        clearInterval(autoRunInterval);
-        autoRunInterval = null;
-        document.getElementById('run-btn').textContent = '▶ Run';
+        const start = positions[idx];
+        const end = positions[idx+1];
+        const startTime = performance.now();
+        function tick(now) {
+          const t = Math.min((now - startTime) / duration, 1.0);
+          packet.position.lerpVectors(start, end, t);
+          if (t < 1) {
+            animId = requestAnimationFrame(tick);
+          } else {
+            idx++;
+            step();
+          }
+        }
+        animId = requestAnimationFrame(tick);
       }
-      resetCPU();
-    });
-
-    // Initialize visual state
-    updateMemoryVisuals();
-    updateRegisterVisuals();
-    updatePanel();
-
-    // -------------------- LAYER SWITCHING --------------------
-    const codePanel = document.getElementById('code-panel');
-    const infoPanel = document.getElementById('info-panel');
-
-    function setLayer(layer) {
-      skinGroup.visible = false;
-      frameworkGroup.visible = false;
-      metaGroup.visible = false;
-      codePanel.style.display = 'none';
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
-      switch(layer) {
-        case 'skin':
-          skinGroup.visible = true;
-          document.getElementById('btn-skin').classList.add('active');
-          infoPanel.innerHTML = `<strong>Skin (Case)</strong><br>Outer shell. Protects internals.`;
-          animateCamera(new THREE.Vector3(4, 2.5, 5), new THREE.Vector3(0, 0.1, 0));
-          break;
-        case 'framework':
-          frameworkGroup.visible = true;
-          document.getElementById('btn-framework').classList.add('active');
-          infoPanel.innerHTML = `<strong>Framework</strong><br>Motherboard, CPU, GPU, RAM. The skeleton.`;
-          animateCamera(new THREE.Vector3(1.5, 1.8, 2.8), new THREE.Vector3(0, -0.2, 0.2));
-          break;
-        case 'metaphysical':
-          frameworkGroup.visible = true;
-          metaGroup.visible = true;
-          codePanel.style.display = 'flex';
-          document.getElementById('btn-metaphysical').classList.add('active');
-          infoPanel.innerHTML = `<strong>Metaphysical (Code Execution)</strong><br>Watch instructions flow. The stickman’s invisible rules become visible.`;
-          animateCamera(new THREE.Vector3(0.4, 0.7, 1.8), new THREE.Vector3(0, -0.1, 0.3));
-          break;
-        case 'overview':
-          skinGroup.visible = true;
-          frameworkGroup.visible = true;
-          metaGroup.visible = true;
-          codePanel.style.display = 'none';
-          document.getElementById('btn-overview').classList.add('active');
-          infoPanel.innerHTML = `<strong>System Overview</strong><br>Unified hardware + code. A complete computer.`;
-          animateCamera(new THREE.Vector3(5, 3.5, 6), new THREE.Vector3(0, 0.2, 0));
-          break;
-      }
+      step();
     }
 
-    function animateCamera(targetPos, targetLook) {
-      const startPos = camera.position.clone();
-      const startLook = controls.target.clone();
-      const startTime = performance.now();
-      const duration = 800;
-      function update(now) {
-        const t = Math.min((now - startTime) / duration, 1.0);
-        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
-        camera.position.lerpVectors(startPos, targetPos, ease);
-        controls.target.lerpVectors(startLook, targetLook, ease);
-        controls.update();
-        if (t < 1) requestAnimationFrame(update);
+    simulateBtn.addEventListener('click', () => {
+      if (!selectedComponent) return;
+      const type = selectedComponent.userData.component;
+      const cpuPos = new THREE.Vector3(0, -0.15, 0.2);
+      const ramPos = new THREE.Vector3(-0.6, -0.05, 0.7);
+      const gpuPos = new THREE.Vector3(0.5, -0.4, -0.1);
+      const chipPos = new THREE.Vector3(-0.5, -0.4, -0.4);
+      let path = [];
+      if (type === 'cpu') {
+        path = [ramPos, cpuPos, ramPos];
+      } else if (type === 'gpu') {
+        path = [cpuPos, gpuPos, cpuPos];
+      } else if (type === 'ram') {
+        path = [cpuPos, ramPos, cpuPos];
+      } else if (type === 'chipset') {
+        path = [chipPos, cpuPos, chipPos];
       }
-      requestAnimationFrame(update);
-    }
+      animatePacketPath(path);
+    });
 
-    document.getElementById('btn-skin').onclick = () => setLayer('skin');
-    document.getElementById('btn-framework').onclick = () => setLayer('framework');
-    document.getElementById('btn-metaphysical').onclick = () => setLayer('metaphysical');
-    document.getElementById('btn-overview').onclick = () => setLayer('overview');
+    // ---- RAYCASTER FOR CLICK ---- 
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    renderer.domElement.addEventListener('click', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(componentsGroup.children, true);
+      if (intersects.length > 0) {
+        let obj = intersects[0].object;
+        while (obj && !obj.userData.component) obj = obj.parent;
+        if (obj && obj.userData.component) {
+          selectedComponent = obj;
+          const comp = obj.userData.component;
+          partName.textContent = comp.toUpperCase();
+          drawBlockDiagram(comp);
+          setCodeSnippet(comp);
+          inspectPanel.style.display = 'flex';
+        }
+      }
+    });
 
-    setLayer('skin'); // start
-
-    // -------------------- ANIMATION LOOP --------------------
+    // ---- ANIMATION LOOP ----
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -593,6 +556,8 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
       labelRenderer.setSize(window.innerWidth, window.innerHeight);
     });
+
+    console.log('Surgeon-level PC inspector ready. Adjust case opacity, toggle clip plane, click components.');
   </script>
 </body>
 </html>
