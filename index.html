@@ -3,27 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>ReverseLab – Visual Product Reverse Engineering Tool</title>
+  <title>ReverseLab – Product Reverse Engineering &amp; Inspection Tool</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a14; overflow: hidden; }
-    /* Layout grid */
+    :root {
+      --bar-height: 48px;
+      --console-height: 40px;
+      --sidebar-width: 260px;
+      --inspector-width: 360px;
+    }
     #app {
       display: grid;
-      grid-template-rows: 48px 1fr 40px;
-      grid-template-columns: 260px 1fr 360px;
+      grid-template-rows: var(--bar-height) 1fr var(--console-height);
+      grid-template-columns: var(--sidebar-width) 1fr var(--inspector-width);
       height: 100vh;
     }
+    /* Command Bar */
     #command-bar {
       grid-column: 1 / -1;
       background: rgba(12, 12, 25, 0.95);
       backdrop-filter: blur(12px);
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
       padding: 0 20px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
       z-index: 50;
+      overflow-x: auto;
     }
     .cmd-btn {
       background: rgba(255,255,255,0.08);
@@ -33,14 +40,15 @@
       border-radius: 6px;
       cursor: pointer;
       font-weight: 500;
-      transition: 0.2s;
       text-transform: uppercase;
       font-size: 0.8rem;
+      white-space: nowrap;
     }
     .cmd-btn:hover { background: rgba(255,255,255,0.15); }
     .cmd-btn.active { background: #4a90e2; border-color: #4a90e2; color: white; }
-    .cmd-btn:disabled { opacity: 0.4; cursor: default; }
+    .cmd-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Product Library (left) */
     #product-library {
       background: rgba(15, 15, 30, 0.95);
       backdrop-filter: blur(10px);
@@ -49,6 +57,7 @@
       padding: 15px;
       color: #ddd;
       z-index: 40;
+      transition: transform 0.3s;
     }
     .library-category {
       font-weight: bold;
@@ -73,6 +82,7 @@
     .library-item:active { cursor: grabbing; }
     .library-item.dragging-source { opacity: 0.3; }
 
+    /* 3D Workspace */
     #workspace {
       position: relative;
       background: radial-gradient(circle at center, #1c1c2e 0%, #0a0a14 80%);
@@ -80,6 +90,7 @@
     }
     #workspace canvas { display: block; }
 
+    /* Inspector Panel (right) */
     #inspector-panel {
       background: rgba(15, 15, 30, 0.95);
       backdrop-filter: blur(15px);
@@ -93,7 +104,7 @@
       z-index: 40;
       transition: transform 0.3s;
     }
-    #inspector-panel.hidden { transform: translateX(360px); }
+    #inspector-panel.hidden { transform: translateX(var(--inspector-width)); }
     .inspector-tabs {
       display: flex;
       gap: 8px;
@@ -112,6 +123,7 @@
     .inspector-tab.active { background: #4a90e2; color: white; }
     .inspector-content { flex: 1; overflow-y: auto; }
 
+    /* Console */
     #console {
       grid-column: 1 / -1;
       background: #0d0d18;
@@ -128,18 +140,39 @@
     .log-entry { white-space: nowrap; }
     .log-time { color: #4a90e2; margin-right: 8px; }
 
-    /* Drag ghost */
-    .drag-ghost {
-      position: fixed;
-      pointer-events: none;
-      z-index: 1000;
-      opacity: 0.9;
-      background: #4a90e2;
-      color: white;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-weight: 600;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    /* Mobile drawer buttons */
+    #toggle-library, #toggle-inspector { display: none; }
+    @media (max-width: 900px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: var(--bar-height) 1fr var(--console-height);
+      }
+      #product-library, #inspector-panel {
+        position: fixed;
+        top: var(--bar-height);
+        bottom: var(--console-height);
+        width: min(85vw, 340px);
+        z-index: 100;
+        box-shadow: 5px 0 25px rgba(0,0,0,0.8);
+      }
+      #product-library {
+        left: 0;
+        transform: translateX(-100%);
+      }
+      #product-library.open {
+        transform: translateX(0);
+      }
+      #inspector-panel {
+        right: 0;
+        transform: translateX(100%);
+      }
+      #inspector-panel.open {
+        transform: translateX(0);
+        box-shadow: -5px 0 25px rgba(0,0,0,0.8);
+      }
+      #toggle-library, #toggle-inspector {
+        display: inline-block;
+      }
     }
   </style>
 </head>
@@ -147,28 +180,19 @@
 <div id="app">
   <!-- Command Bar -->
   <div id="command-bar">
-    <button class="cmd-btn" id="mode-inspect">🔍 Inspect</button>
+    <button class="cmd-btn active" id="mode-inspect">🔍 Inspect</button>
     <button class="cmd-btn" id="mode-move">✋ Move</button>
     <button class="cmd-btn" id="mode-connect">🔗 Connect</button>
     <button class="cmd-btn" id="mode-explode">💥 Explode</button>
     <button class="cmd-btn" id="import-manual">📄 Import Manual</button>
+    <button class="cmd-btn" id="toggle-library">☰ Library</button>
+    <button class="cmd-btn" id="toggle-inspector">ⓘ Inspector</button>
     <button class="cmd-btn" id="undo-btn" disabled>↩ Undo</button>
     <button class="cmd-btn" id="redo-btn" disabled>↪ Redo</button>
   </div>
 
   <!-- Product Library -->
-  <div id="product-library">
-    <h3 style="margin-bottom:10px;">📦 Catalogue</h3>
-    <div class="library-category">Systems</div>
-    <div class="library-item" data-type="raspberrypi" data-name="Raspberry Pi 4">Raspberry Pi 4</div>
-    <div class="library-item" data-type="drill" data-name="Electric Drill">Electric Drill</div>
-    <div class="library-category">Electronics</div>
-    <div class="library-item" data-type="motor" data-name="DC Motor">DC Motor 12V</div>
-    <div class="library-item" data-type="battery" data-name="Li-ion Pack">Li-ion Battery</div>
-    <div class="library-category">Mechanical</div>
-    <div class="library-item" data-type="gearbox" data-name="Planetary Gearbox">Planetary Gearbox</div>
-    <div class="library-item" data-type="frame" data-name="Drone Frame">Drone Frame</div>
-  </div>
+  <div id="product-library"></div>
 
   <!-- 3D Workspace -->
   <div id="workspace"></div>
@@ -208,24 +232,129 @@
 <script type="module">
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-  // ---------- APPLICATION STATE ----------
+  // ==================== PRODUCT DATABASE ====================
+  const productDatabase = {
+    raspberrypi4: {
+      name: 'Raspberry Pi 4 Model B',
+      category: 'Single Board Computers',
+      modelUrl: 'assets/models/raspberry-pi-4.glb', // real GLB path
+      thumbnailUrl: 'assets/thumbs/raspi4.png',
+      parts: ['SoC (BCM2711)', '4GB LPDDR4', 'USB-C Power', 'GPIO Header (40 pins)', 'HDMI', 'Ethernet', 'USB 3.0'],
+      connections: ['Power -> SoC', 'SoC -> RAM', 'SoC -> GPIO', 'SoC -> HDMI', 'SoC -> Ethernet'],
+      specs: { soc: 'Broadcom BCM2711', cpu: '4x Cortex-A72 @1.5GHz', ram: '4GB LPDDR4', power: '5V 3A' },
+      upgrades: ['8GB RAM model', 'Argon ONE case', 'NVMe SSD HAT', 'Active cooler'],
+      buildProceduralModel: (group) => {
+        // Detailed board with chips and GPIO pins
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.12, 0.56),
+          new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.7 }));
+        board.position.y = 0.06;
+        group.add(board);
+        const soc = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.22),
+          new THREE.MeshStandardMaterial({ color: 0x111122 }));
+        soc.position.set(0.1, 0.12, 0.1);
+        group.add(soc);
+        for (let i = 0; i < 12; i++) {
+          const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.08),
+            new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+          pin.position.set(-0.36 + i * 0.065, 0.12, 0.2);
+          group.add(pin);
+        }
+      }
+    },
+    raspberrypi5: {
+      name: 'Raspberry Pi 5',
+      category: 'Single Board Computers',
+      modelUrl: 'assets/models/raspberry-pi-5.glb',
+      thumbnailUrl: 'assets/thumbs/raspi5.png',
+      parts: ['SoC (BCM2712)', '8GB LPDDR4X', 'USB-C PD', 'GPIO Header', 'HDMI 2.1', 'PCIe 2.0'],
+      connections: ['Power -> SoC', 'SoC -> RAM', 'SoC -> PCIe'],
+      specs: { soc: 'BCM2712', cpu: '4x Cortex-A76 @2.4GHz', ram: '8GB' },
+      upgrades: ['M.2 NVMe adapter', 'Active cooler', 'HAT+ add-ons'],
+      buildProceduralModel: (group) => {
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.12, 0.56),
+          new THREE.MeshStandardMaterial({ color: 0x1f4f1f }));
+        board.position.y = 0.06;
+        group.add(board);
+        const soc = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.24),
+          new THREE.MeshStandardMaterial({ color: 0x222244 }));
+        soc.position.set(0.1, 0.13, 0.1);
+        group.add(soc);
+      }
+    },
+    arduino_uno: {
+      name: 'Arduino Uno R3',
+      category: 'Microcontrollers',
+      modelUrl: null,
+      parts: ['ATmega328P', 'USB-to-Serial', 'Power jack', 'GPIO header'],
+      connections: ['USB -> ATmega328P', 'Power -> ATmega328P', 'ATmega328P -> GPIO'],
+      specs: { mcu: 'ATmega328P', voltage: '5V', flash: '32KB' },
+      upgrades: ['ATmega328P replacement', 'Shields'],
+      buildProceduralModel: (group) => {
+        const board = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.5),
+          new THREE.MeshStandardMaterial({ color: 0x006699 }));
+        board.position.y = 0.05;
+        group.add(board);
+        const chip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 0.2),
+          new THREE.MeshStandardMaterial({ color: 0x222222 }));
+        chip.position.set(0, 0.1, 0.1);
+        group.add(chip);
+      }
+    },
+    motor_dc: {
+      name: 'DC Motor (12V)',
+      category: 'Motors',
+      parts: ['Rotor', 'Stator', 'Commutator', 'Brushes'],
+      connections: ['Power -> Brushes -> Commutator -> Rotor'],
+      specs: { voltage: '12V', rpm: '6000', torque: '0.3Nm' },
+      upgrades: ['Brushless conversion'],
+      buildProceduralModel: (group) => {
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.4),
+          new THREE.MeshStandardMaterial({ color: 0x555566 }));
+        group.add(body);
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.25),
+          new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+        shaft.position.y = 0.3;
+        group.add(shaft);
+      }
+    },
+    drill: {
+      name: 'Electric Drill (18V)',
+      category: 'Complete Tools',
+      parts: ['Motor', 'Battery', 'Trigger', 'Gearbox', 'Chuck'],
+      connections: ['Battery -> Trigger -> Motor -> Gearbox -> Chuck'],
+      specs: { voltage: '18V', speed: '0-1500 RPM', chuck: '13mm' },
+      upgrades: ['Lithium battery', 'Brushless motor'],
+      buildProceduralModel: (group) => {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.7),
+          new THREE.MeshStandardMaterial({ color: 0xffaa00 }));
+        group.add(body);
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.25),
+          new THREE.MeshStandardMaterial({ color: 0x222222 }));
+        handle.position.set(0, -0.35, 0.1);
+        group.add(handle);
+      }
+    }
+  };
+
+  // ==================== APPLICATION STATE ====================
   const state = {
-    mode: 'inspect',       // inspect | move | connect | explode
-    objects: [],           // placed 3D objects { id, mesh, product, position }
+    mode: 'inspect',
+    objects: [],
     selectedId: null,
     history: [],
     historyIndex: -1,
     log: []
   };
 
-  // ---------- 3D SCENE SETUP ----------
+  // ==================== SCENE SETUP ====================
   const workspace = document.getElementById('workspace');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0c0c18);
   const camera = new THREE.PerspectiveCamera(45, workspace.clientWidth / workspace.clientHeight, 0.5, 50);
   camera.position.set(5, 3, 6);
-  camera.lookAt(0, 0, 0);
+  camera.lookAt(0, 0.5, 0);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(workspace.clientWidth, workspace.clientHeight);
   renderer.shadowMap.enabled = true;
@@ -236,146 +365,68 @@
   controls.target.set(0, 0.5, 0);
   controls.update();
 
-  // Lighting
   scene.add(new THREE.AmbientLight(0x404066));
   const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
   dirLight.position.set(5, 8, 5);
   dirLight.castShadow = true;
   dirLight.receiveShadow = true;
-  dirLight.shadow.mapSize.width = 1024;
-  dirLight.shadow.mapSize.height = 1024;
   scene.add(dirLight);
-  // Ground plane for reference
-  const grid = new THREE.GridHelper(6, 20, 0x333355, 0x222233);
+  const grid = new THREE.GridHelper(8, 20, 0x333355, 0x222233);
   scene.add(grid);
 
-  // ---------- PRODUCT MODELS & DATA ----------
-  const productDatabase = {
-    raspberrypi: {
-      name: 'Raspberry Pi 4',
-      parts: ['SoC (Broadcom BCM2711)', 'RAM (4GB LPDDR4)', 'USB-C Power', 'GPIO Header', 'HDMI', 'Ethernet'],
-      connections: ['Power -> SoC', 'SoC -> RAM', 'GPIO -> external'],
-      specs: { voltage: '5V', current: '3A', cores: '4x ARM Cortex-A72' },
-      upgrades: ['8GB RAM kit', 'Heatsink', 'NVMe HAT'],
-      model: (group) => {
-        const board = new THREE.BoxGeometry(0.85, 0.1, 0.55);
-        const mesh = new THREE.Mesh(board, new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.7 }));
-        mesh.position.y = 0.05;
-        group.add(mesh);
-        // SoC chip
-        const soc = new THREE.BoxGeometry(0.2, 0.06, 0.2);
-        const socMesh = new THREE.Mesh(soc, new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 }));
-        socMesh.position.set(0.1, 0.08, 0.1);
-        group.add(socMesh);
-        // GPIO pins
-        for (let i=0; i<12; i++) {
-          const pin = new THREE.CylinderGeometry(0.02,0.02,0.1,6);
-          const pinMesh = new THREE.Mesh(pin, new THREE.MeshStandardMaterial({ color: 0xcccccc }));
-          pinMesh.position.set(-0.35 + i*0.06, 0.1, 0.2);
-          group.add(pinMesh);
-        }
-      }
-    },
-    motor: {
-      name: 'DC Motor 12V',
-      parts: ['Rotor', 'Stator', 'Commutator', 'Brushes', 'Shaft'],
-      connections: ['Battery -> Brushes -> Commutator -> Rotor'],
-      specs: { voltage: '12V', rpm: '3000', torque: '0.5 Nm' },
-      upgrades: ['Brushless motor', 'Encoder'],
-      model: (group) => {
-        const body = new THREE.CylinderGeometry(0.15, 0.15, 0.4, 16);
-        const mesh = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ color: 0x555566, roughness: 0.5 }));
-        mesh.position.y = 0.2;
-        group.add(mesh);
-        const shaft = new THREE.CylinderGeometry(0.03, 0.03, 0.25, 8);
-        const shaftMesh = new THREE.Mesh(shaft, new THREE.MeshStandardMaterial({ color: 0xcccccc }));
-        shaftMesh.position.y = 0.45;
-        group.add(shaftMesh);
-      }
-    },
-    battery: {
-      name: 'Li-ion Battery Pack',
-      parts: ['Cells (3x18650)', 'BMS', 'Connector'],
-      connections: ['Cells -> BMS -> Connector'],
-      specs: { voltage: '11.1V', capacity: '3000mAh' },
-      upgrades: ['Higher capacity cells', 'Fast charging BMS'],
-      model: (group) => {
-        const box = new THREE.BoxGeometry(0.3, 0.2, 0.15);
-        const mesh = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.6 }));
-        group.add(mesh);
-      }
-    },
-    gearbox: {
-      name: 'Planetary Gearbox',
-      parts: ['Sun gear', 'Planet gears (3)', 'Ring gear', 'Carrier'],
-      connections: ['Motor shaft -> Sun gear -> Planets -> Carrier'],
-      specs: { ratio: '5:1', material: 'Steel' },
-      upgrades: ['Metal gears', 'Lubrication'],
-      model: (group) => {
-        const ring = new THREE.TorusGeometry(0.18, 0.05, 8, 16);
-        const mesh = new THREE.Mesh(ring, new THREE.MeshStandardMaterial({ color: 0x888888 }));
-        mesh.position.y = 0.15;
-        group.add(mesh);
-      }
-    },
-    drill: {
-      name: 'Electric Drill',
-      parts: ['Motor', 'Battery', 'Trigger', 'Gearbox', 'Chuck'],
-      connections: ['Battery -> Trigger -> Motor -> Gearbox -> Chuck'],
-      specs: { voltage: '18V', rpm: '1500' },
-      upgrades: ['Brushless motor', 'Lithium battery'],
-      model: (group) => {
-        const body = new THREE.BoxGeometry(0.3, 0.25, 0.6);
-        const mesh = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.5 }));
-        group.add(mesh);
-        const handle = new THREE.BoxGeometry(0.15, 0.4, 0.2);
-        const handleMesh = new THREE.Mesh(handle, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-        handleMesh.position.set(0, -0.3, 0.1);
-        group.add(handleMesh);
-      }
-    },
-    frame: {
-      name: 'Drone Frame',
-      parts: ['Arms (4)', 'Center plate', 'Landing gear'],
-      connections: ['Arms -> Center plate'],
-      specs: { material: 'Carbon fiber', weight: '250g' },
-      upgrades: ['Titanium screws', 'Longer arms'],
-      model: (group) => {
-        const center = new THREE.BoxGeometry(0.4, 0.1, 0.4);
-        group.add(new THREE.Mesh(center, new THREE.MeshStandardMaterial({ color: 0x444444 })));
-        for (let i=0; i<4; i++) {
-          const arm = new THREE.BoxGeometry(0.8, 0.05, 0.05);
-          const armMesh = new THREE.Mesh(arm, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-          armMesh.position.x = Math.cos(i*Math.PI/2)*0.4;
-          armMesh.position.z = Math.sin(i*Math.PI/2)*0.4;
-          armMesh.rotation.y = i*Math.PI/2;
-          group.add(armMesh);
-        }
-      }
-    }
-  };
+  // GLTF loader cache
+  const gltfLoader = new GLTFLoader();
 
-  // ---------- OBJECT PLACEMENT ----------
+  // ==================== OBJECT MANAGEMENT ====================
   let nextId = 1;
-  function addObjectToScene(type, position) {
-    if (!productDatabase[type]) return;
+  function addObjectToScene(type, position, save = true) {
     const product = productDatabase[type];
+    if (!product) return null;
     const group = new THREE.Group();
-    product.model(group);
     group.position.copy(position);
     group.userData = { id: nextId, type, product };
+
+    // Try loading real model, fallback to procedural
+    if (product.modelUrl) {
+      gltfLoader.load(product.modelUrl,
+        (gltf) => {
+          group.add(gltf.scene);
+        },
+        undefined,
+        () => {
+          // fallback
+          product.buildProceduralModel(group);
+        }
+      );
+    } else {
+      product.buildProceduralModel(group);
+    }
+
     scene.add(group);
     const obj = { id: nextId, mesh: group, product: { ...product, type }, position: position.clone() };
     state.objects.push(obj);
     nextId++;
-    addLog(`Placed ${product.name} at (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`);
-    saveHistory();
+    if (save) saveHistory();
+    addLog(`Placed ${product.name} at (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
     return obj;
   }
 
-  // ---------- HISTORY (UNDO/REDO) ----------
+  function removeObjectById(id, save = true) {
+    const idx = state.objects.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      scene.remove(state.objects[idx].mesh);
+      state.objects.splice(idx, 1);
+      if (save) saveHistory();
+    }
+  }
+
+  // ==================== HISTORY (UNDO/REDO) ====================
   function saveHistory() {
-    const snapshot = JSON.stringify(state.objects.map(o => ({ id: o.id, type: o.product.type, pos: [o.position.x, o.position.y, o.position.z] })));
+    const snapshot = JSON.stringify(state.objects.map(o => ({
+      id: o.id,
+      type: o.product.type,
+      pos: [o.position.x, o.position.y, o.position.z]
+    })));
     if (state.historyIndex < state.history.length - 1) {
       state.history = state.history.slice(0, state.historyIndex + 1);
     }
@@ -397,12 +448,12 @@
   }
   function restoreSnapshot(snapshotStr) {
     const data = JSON.parse(snapshotStr);
-    // Clear existing objects
-    state.objects.forEach(obj => scene.remove(obj.mesh));
+    // Remove all current objects silently
+    state.objects.forEach(o => scene.remove(o.mesh));
     state.objects = [];
     data.forEach(item => {
       const pos = new THREE.Vector3(item.pos[0], item.pos[1], item.pos[2]);
-      addObjectToScene(item.type, pos);
+      addObjectToScene(item.type, pos, false); // do NOT save history
     });
   }
   function updateUndoRedo() {
@@ -410,42 +461,79 @@
     document.getElementById('redo-btn').disabled = state.historyIndex >= state.history.length - 1;
   }
 
-  // ---------- LOGGING ----------
+  // ==================== LOGGING ====================
   function addLog(message) {
-    const time = new Date().toLocaleTimeString();
-    state.log.push({ time, message });
+    state.log.push({ time: new Date().toLocaleTimeString(), message });
     renderLog();
   }
   function renderLog() {
     const container = document.getElementById('log-container');
-    container.innerHTML = state.log.slice(-5).map(l => `<span class="log-entry"><span class="log-time">${l.time}</span> ${l.message}</span>`).join(' ');
+    container.innerHTML = state.log.slice(-5).map(l =>
+      `<span class="log-entry"><span class="log-time">${l.time}</span> ${l.message}</span>`
+    ).join(' ');
   }
 
-  // ---------- DRAG AND DROP FROM LIBRARY ----------
-  const libraryItems = document.querySelectorAll('.library-item');
+  // ==================== RENDER LIBRARY ====================
+  function renderLibrary() {
+    const library = document.getElementById('product-library');
+    library.innerHTML = '<h3 style="margin-bottom:10px;">📦 Catalogue</h3>';
+    const categories = {};
+    Object.entries(productDatabase).forEach(([type, product]) => {
+      if (!categories[product.category]) categories[product.category] = [];
+      categories[product.category].push({ type, ...product });
+    });
+    for (const [cat, items] of Object.entries(categories)) {
+      const catDiv = document.createElement('div');
+      catDiv.className = 'library-category';
+      catDiv.textContent = cat;
+      library.appendChild(catDiv);
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'library-item';
+        el.draggable = true;
+        el.dataset.type = item.type;
+        el.dataset.name = item.name;
+        el.textContent = item.name;
+        // Drag events
+        el.addEventListener('dragstart', onDragStart);
+        el.addEventListener('dragend', onDragEnd);
+        // Click fallback (mobile / accessibility)
+        el.addEventListener('click', (e) => {
+          // Only if not dragging (dragend clears this)
+          if (!draggedType) {
+            const pos = new THREE.Vector3(0, 0, 0);
+            addObjectToScene(item.type, pos);
+          }
+        });
+        library.appendChild(el);
+      });
+    }
+  }
+
+  // ==================== DRAG AND DROP ====================
   let draggedType = null;
   let draggedName = null;
   let ghostEl = null;
 
-  libraryItems.forEach(item => {
-    item.addEventListener('dragstart', (e) => {
-      draggedType = item.dataset.type;
-      draggedName = item.dataset.name;
-      e.dataTransfer.setData('text/plain', draggedType);
-      item.classList.add('dragging-source');
-      // Create custom ghost
-      ghostEl = document.createElement('div');
-      ghostEl.className = 'drag-ghost';
-      ghostEl.textContent = draggedName;
-      document.body.appendChild(ghostEl);
-      e.dataTransfer.setDragImage(ghostEl, 50, 20);
-    });
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging-source');
-      if (ghostEl) { document.body.removeChild(ghostEl); ghostEl = null; }
-      draggedType = null;
-    });
-  });
+  function onDragStart(e) {
+    draggedType = e.target.dataset.type;
+    draggedName = e.target.dataset.name;
+    e.target.classList.add('dragging-source');
+    ghostEl = document.createElement('div');
+    ghostEl.className = 'drag-ghost';
+    ghostEl.style.cssText = 'position:fixed; pointer-events:none; z-index:1000; opacity:0.9; background:#4a90e2; color:white; padding:6px 14px; border-radius:8px; font-weight:600;';
+    ghostEl.textContent = draggedName;
+    document.body.appendChild(ghostEl);
+    e.dataTransfer.setDragImage(ghostEl, 50, 20);
+    e.dataTransfer.effectAllowed = 'copy';
+  }
+
+  function onDragEnd(e) {
+    e.target.classList.remove('dragging-source');
+    if (ghostEl) document.body.removeChild(ghostEl);
+    ghostEl = null;
+    draggedType = null;
+  }
 
   workspace.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -456,29 +544,28 @@
     e.preventDefault();
     if (!draggedType) return;
     const rect = renderer.domElement.getBoundingClientRect();
-    const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const mouse = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
     const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2(mouseX, mouseY);
     raycaster.setFromCamera(mouse, camera);
-    // Intersect with a ground plane at y=0
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const point = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, point);
     if (point) {
-      const obj = addObjectToScene(draggedType, point);
-      addLog(`Dragged ${draggedName} into workspace.`);
+      addObjectToScene(draggedType, point);
     }
+    draggedType = null;
   });
 
-  // ---------- INSPECTOR LOGIC ----------
+  // ==================== INSPECTOR ====================
   const inspectorPanel = document.getElementById('inspector-panel');
   const inspTitle = document.getElementById('inspector-title');
   const inspContent = document.getElementById('inspector-content');
   const closeInspector = document.getElementById('close-inspector');
-  const inspectorTabs = document.querySelectorAll('.inspector-tab');
-  let activeTab = 'overview';
   let inspectedObj = null;
+  let activeTab = 'overview';
 
   function showInspector(obj) {
     inspectedObj = obj;
@@ -489,13 +576,15 @@
     document.querySelector('.inspector-tab[data-tab="overview"]').classList.add('active');
     renderInspectorContent();
   }
+
   function renderInspectorContent() {
     if (!inspectedObj) return;
     const prod = inspectedObj.product;
     let html = '';
     switch (activeTab) {
       case 'overview':
-        html = `<p><strong>Type:</strong> ${prod.type}</p><p>${prod.specs && Object.entries(prod.specs).map(([k,v])=>`<strong>${k}:</strong> ${v}`).join('<br>')}</p>`;
+        html = `<p><strong>Type:</strong> ${prod.category}</p>`;
+        if (prod.specs) html += Object.entries(prod.specs).map(([k,v]) => `<strong>${k}:</strong> ${v}`).join('<br>');
         break;
       case 'parts':
         html = `<ul>${prod.parts.map(p => `<li>${p}</li>`).join('')}</ul>`;
@@ -507,12 +596,13 @@
         html = `<pre>${JSON.stringify(prod.specs, null, 2)}</pre>`;
         break;
       case 'upgrades':
-        html = `<ul>${prod.upgrades.map(u => `<li>✅ ${u}</li>`).join('')}</ul>`;
+        html = `<ul>${(prod.upgrades || []).map(u => `<li>✅ ${u}</li>`).join('')}</ul>`;
         break;
     }
     inspContent.innerHTML = html;
   }
-  inspectorTabs.forEach(tab => {
+
+  document.querySelectorAll('.inspector-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       activeTab = tab.dataset.tab;
       document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
@@ -520,14 +610,14 @@
       renderInspectorContent();
     });
   });
+
   closeInspector.addEventListener('click', () => {
     inspectorPanel.classList.add('hidden');
     inspectedObj = null;
   });
 
-  // ---------- CLICK SELECTION IN WORKSPACE ----------
+  // Click selection in workspace
   renderer.domElement.addEventListener('click', (e) => {
-    if (e.detail > 1) return; // ignore double
     const rect = renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
       ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -541,50 +631,52 @@
       while (obj && !obj.userData.id) obj = obj.parent;
       if (obj && obj.userData.id) {
         const found = state.objects.find(o => o.id === obj.userData.id);
-        if (found) {
-          showInspector(found);
-          addLog(`Inspecting ${found.product.name}`);
-        }
+        if (found) showInspector(found);
       }
     }
   });
 
-  // ---------- MODE SWITCHING ----------
-  const modeButtons = {
-    inspect: document.getElementById('mode-inspect'),
-    move: document.getElementById('mode-move'),
-    connect: document.getElementById('mode-connect'),
-    explode: document.getElementById('mode-explode')
-  };
+  // ==================== MODES ====================
   function setMode(mode) {
     state.mode = mode;
-    Object.keys(modeButtons).forEach(m => modeButtons[m].classList.remove('active'));
-    modeButtons[mode].classList.add('active');
-    controls.enableRotate = mode !== 'connect'; // simple example
+    ['inspect', 'move', 'connect', 'explode'].forEach(m =>
+      document.getElementById(`mode-${m}`).classList.toggle('active', m === mode)
+    );
+    controls.enableRotate = mode !== 'connect';
     addLog(`Mode: ${mode}`);
   }
-  modeButtons.inspect.addEventListener('click', () => setMode('inspect'));
-  modeButtons.move.addEventListener('click', () => setMode('move'));
-  modeButtons.connect.addEventListener('click', () => setMode('connect'));
-  modeButtons.explode.addEventListener('click', () => setMode('explode'));
-  setMode('inspect');
+  document.getElementById('mode-inspect').addEventListener('click', () => setMode('inspect'));
+  document.getElementById('mode-move').addEventListener('click', () => setMode('move'));
+  document.getElementById('mode-connect').addEventListener('click', () => setMode('connect'));
+  document.getElementById('mode-explode').addEventListener('click', () => setMode('explode'));
 
-  // ---------- IMPORT MANUAL (FAKE) ----------
+  // ==================== IMPORT MANUAL (FAKE) ====================
   document.getElementById('import-manual').addEventListener('click', () => {
-    addLog('Importing manual for Electric Drill...');
-    // Simulate extraction and build
-    const pos = new THREE.Vector3(1, 0, 1);
+    addLog('Importing electric drill manual...');
+    const pos = new THREE.Vector3(1.2, 0, 1.2);
     const drill = addObjectToScene('drill', pos);
     addLog('AI extracted parts: Motor, Battery, Trigger, Gearbox, Chuck');
-    addLog('Built digital twin of Electric Drill.');
-    showInspector(drill);
+    if (drill) showInspector(drill);
   });
 
-  // ---------- UNDO/REDO BUTTONS ----------
+  // ==================== MOBILE DRAWER TOGGLES ====================
+  document.getElementById('toggle-library').addEventListener('click', () => {
+    document.getElementById('product-library').classList.toggle('open');
+  });
+  document.getElementById('toggle-inspector').addEventListener('click', () => {
+    document.getElementById('inspector-panel').classList.toggle('open');
+  });
+
+  // ==================== UNDO/REDO BUTTONS ====================
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
 
-  // ---------- ANIMATION LOOP ----------
+  // ==================== INIT ====================
+  renderLibrary();
+  saveHistory();
+  addLog('ReverseLab ready. Drag components from library or click to place.');
+
+  // Animation loop
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
@@ -592,16 +684,11 @@
   }
   animate();
 
-  // Resize handler
   window.addEventListener('resize', () => {
     camera.aspect = workspace.clientWidth / workspace.clientHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(workspace.clientWidth, workspace.clientHeight);
   });
-
-  // Initial history snapshot
-  saveHistory();
-  addLog('ReverseLab ready. Drag components from library or import a manual.');
 </script>
 </body>
 </html>
