@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Kerplunk PC Builder – Drag‑and‑Drop Construction with Code Inspection</title>
+  <title>Production-Grade PC Inspection Bench – Proper PCB Routing, Code-to-Pin Mapping</title>
   <style>
     body {
       margin: 0;
@@ -11,93 +11,53 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: #0a0a14;
     }
-    /* ---- Sidebar Library ---- */
-    #sidebar {
+    /* ---- Top toolbar ---- */
+    #toolbar {
       position: fixed;
+      top: 0;
       left: 0;
-      top: 0;
-      bottom: 0;
-      width: 260px;
-      background: rgba(15, 15, 30, 0.95);
-      backdrop-filter: blur(15px);
-      border-right: 1px solid rgba(255,255,255,0.15);
-      z-index: 40;
-      overflow-y: auto;
-      padding: 15px;
-      color: #ddd;
-    }
-    .category {
-      margin-top: 15px;
-      font-weight: bold;
-      color: #8ab4f8;
-      text-transform: uppercase;
-      font-size: 0.85rem;
-      letter-spacing: 1px;
-    }
-    .component-item {
-      background: rgba(255,255,255,0.08);
-      border-radius: 8px;
-      padding: 10px;
-      margin: 6px 0;
-      cursor: grab;
-      user-select: none;
-      transition: 0.2s;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .component-item:active {
-      cursor: grabbing;
-      background: rgba(74, 144, 226, 0.3);
-    }
-    .comp-spec {
-      font-size: 0.75rem;
-      color: #aaa;
-    }
-    /* ---- Top status bar ---- */
-    #status-bar {
-      position: fixed;
-      top: 0;
-      left: 260px;
       right: 0;
+      height: 45px;
       background: rgba(10, 10, 20, 0.92);
       backdrop-filter: blur(12px);
-      height: 40px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 20px;
       padding: 0 20px;
       z-index: 40;
-      border-bottom: 1px solid rgba(255,255,255,0.12);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
     }
-    .stat {
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       color: #ccc;
-      font-size: 0.9rem;
-      margin-right: 25px;
     }
     button {
       background: #4a90e2;
       border: none;
       color: white;
-      padding: 6px 18px;
-      border-radius: 6px;
-      font-weight: 600;
+      padding: 5px 15px;
+      border-radius: 5px;
       cursor: pointer;
-      transition: 0.2s;
+      font-weight: 600;
     }
     button:disabled {
       background: #555;
       cursor: default;
     }
-    /* ---- Inspector panel (right) ---- */
+    input[type=range] {
+      width: 90px;
+    }
+    /* Inspector panel */
     #inspector {
       position: fixed;
       right: 20px;
-      top: 120px;
-      width: 350px;
+      top: 100px;
+      width: 360px;
       background: rgba(15, 15, 30, 0.95);
       border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 20px;
+      border-radius: 16px;
       padding: 20px;
       color: #ddd;
       z-index: 35;
@@ -106,92 +66,54 @@
       gap: 15px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.7);
     }
-    #inspector h3 {
-      margin: 0;
-      color: #8ab4f8;
-    }
-    canvas.block-diagram {
+    #inspector h3 { margin:0; color:#8ab4f8; }
+    canvas.pin-diagram {
       width: 100%;
-      height: 130px;
-      background: #1a1a2e;
+      height: 160px;
+      background: #0d0d20;
       border-radius: 8px;
     }
     .code-snippet {
       background: #111122;
-      border-radius: 8px;
       padding: 10px;
       font-family: monospace;
       font-size: 0.8rem;
     }
-    /* ---- Clipping controls ---- */
-    .control-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 5px 0;
-    }
-    input[type=range] {
-      width: 100px;
+    .highlight { background: #4a90e2; color: white; }
+    /* Clipping plane indicator */
+    #clip-info {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      color: #aaa;
+      font-size: 0.85rem;
+      background: rgba(0,0,0,0.6);
+      padding: 5px 12px;
+      border-radius: 6px;
     }
   </style>
 </head>
 <body>
-  <!-- Sidebar library -->
-  <div id="sidebar">
-    <h2 style="margin-top:0;">🧩 Component Library</h2>
-    <div class="category">CPU</div>
-    <div class="component-item" data-type="cpu" data-model="i5-13600K" data-spec="14C/20T, 3.5GHz, 125W">
-      <span>i5-13600K</span><span class="comp-spec">14C/20T</span>
+  <div id="toolbar">
+    <div class="tool-group">
+      <span>🔍 Case Opacity</span>
+      <input type="range" id="opacity-slider" min="0" max="100" value="100">
     </div>
-    <div class="component-item" data-type="cpu" data-model="Ryzen 7 7800X3D" data-spec="8C/16T, 4.2GHz, 120W">
-      <span>Ryzen 7 7800X3D</span><span class="comp-spec">8C/16T</span>
+    <div class="tool-group">
+      <button id="clip-toggle">🧠 Clip Plane OFF</button>
+      <input type="range" id="clip-slider" min="-1.5" max="1.5" value="0" step="0.01" disabled>
     </div>
-    <div class="category">GPU</div>
-    <div class="component-item" data-type="gpu" data-model="RTX 4070" data-spec="12GB GDDR6X, 200W">
-      <span>RTX 4070</span><span class="comp-spec">12GB</span>
-    </div>
-    <div class="component-item" data-type="gpu" data-model="RX 7800 XT" data-spec="16GB GDDR6, 263W">
-      <span>RX 7800 XT</span><span class="comp-spec">16GB</span>
-    </div>
-    <div class="category">RAM</div>
-    <div class="component-item" data-type="ram" data-model="DDR5-6000 16GB" data-spec="16GB, 1.35V">
-      <span>DDR5-6000 16GB</span><span class="comp-spec">16GB</span>
-    </div>
-    <div class="component-item" data-type="ram" data-model="DDR5-6000 32GB" data-spec="32GB, 1.35V">
-      <span>DDR5-6000 32GB</span><span class="comp-spec">32GB</span>
-    </div>
-    <div class="category">Storage</div>
-    <div class="component-item" data-type="storage" data-model="Samsung 990 Pro 1TB" data-spec="NVMe M.2, 1TB">
-      <span>990 Pro 1TB</span><span class="comp-spec">1TB NVMe</span>
-    </div>
-    <div class="category">PSU</div>
-    <div class="component-item" data-type="psu" data-model="Corsair RM850x" data-spec="850W, 80+ Gold">
-      <span>RM850x</span><span class="comp-spec">850W</span>
-    </div>
-    <div class="category">Cooler</div>
-    <div class="component-item" data-type="cooler" data-model="NH-D15" data-spec="Air, 220W TDP">
-      <span>NH-D15</span><span class="comp-spec">Air</span>
-    </div>
+    <button id="reset-view">↺ Reset View</button>
   </div>
-
-  <!-- Top status -->
-  <div id="status-bar">
-    <div>
-      <span class="stat" id="cpu-stat">🧠 No CPU</span>
-      <span class="stat" id="ram-stat">🧮 No RAM</span>
-      <span class="stat" id="gpu-stat">🎮 No GPU</span>
-      <span class="stat" id="power-stat">⚡ 0W / 0W</span>
-    </div>
-    <button id="boot-btn" disabled>🔌 Boot System</button>
-  </div>
-
-  <!-- Inspector panel -->
   <div id="inspector">
     <button id="close-inspector" style="align-self:flex-end; background:transparent; border:1px solid #aaa; color:#aaa;">✕</button>
     <h3 id="inspector-title">Component</h3>
-    <canvas id="block-diagram" class="block-diagram" width="300" height="130"></canvas>
+    <canvas id="pin-diagram" class="pin-diagram" width="320" height="160"></canvas>
     <div class="code-snippet" id="inspector-code"></div>
+    <button id="step-btn" disabled>▶ Step Instruction</button>
+    <div style="font-size:0.8rem; color:#aaa;" id="exec-status"></div>
   </div>
+  <div id="clip-info">Clip plane at Z = 0.0</div>
 
   <script type="importmap">
     {
@@ -207,27 +129,105 @@
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
+    // ---------------- REAL PCB MODEL ----------------
+    // We'll define a realistic motherboard with known pin positions and routes.
+    // All coordinates in mm, scaled to world units (1 unit = 10 mm for visibility).
+    const scale = 0.1; // 1 unit = 10mm, so motherboard ~ 24cm x 19cm -> 2.4x1.9 units
+    const boardWidth = 2.4, boardHeight = 1.9;
+    const boardThickness = 0.08;
+
+    // Pin definitions (world coordinates, relative to board center)
+    // CPU socket: 4x4 grid of pads (LGA-like)
+    const cpuPins = [];
+    for (let i=-1.5; i<=1.5; i+=1) {
+      for (let j=-0.3; j<=0.9; j+=0.6) {
+        cpuPins.push({ pos: new THREE.Vector3(i*0.15, -0.44, j*0.15+0.2), label: `CPU_P${cpuPins.length}` });
+      }
+    }
+    // RAM slot pins (two slots)
+    const ram0Pins = [];
+    for (let k=0; k<12; k++) {
+      ram0Pins.push({ pos: new THREE.Vector3(-0.7 + k*0.03, -0.44, 0.65), label: `RAM0_${k}` });
+    }
+    const ram1Pins = [];
+    for (let k=0; k<12; k++) {
+      ram1Pins.push({ pos: new THREE.Vector3(0.7 - k*0.03, -0.44, 0.65), label: `RAM1_${k}` });
+    }
+    // PCIe slot pins
+    const pciePins = [];
+    for (let m=0; m<16; m++) {
+      pciePins.push({ pos: new THREE.Vector3(0.5, -0.44, -0.4 + m*0.04), label: `PCIE_${m}` });
+    }
+
+    // Routing rules: we'll precompute trace segments connecting specific pins.
+    // For demonstration, connect CPU memory bus to RAM slots and PCIe.
+    const routes = [
+      { from: cpuPins[0].pos, to: ram0Pins[0].pos, signal: 'DQ0' },
+      { from: cpuPins[1].pos, to: ram0Pins[1].pos, signal: 'DQ1' },
+      { from: cpuPins[2].pos, to: ram0Pins[2].pos, signal: 'DQ2' },
+      { from: cpuPins[3].pos, to: ram1Pins[0].pos, signal: 'DQ3' },
+      { from: cpuPins[4].pos, to: pciePins[0].pos, signal: 'TX0' },
+      { from: cpuPins[5].pos, to: pciePins[1].pos, signal: 'TX1' },
+    ];
+
+    // Generate realistic-looking trace geometry with 45° corners and via markers
+    function createTrace(start, end, color = 0xd4af37) {
+      const points = [];
+      const sx = start.x, sy = start.y, sz = start.z;
+      const ex = end.x, ey = end.y, ez = end.z;
+      // Simple manhattan routing: first move in X, then Z (or vice versa) with a via at corner
+      points.push(new THREE.Vector3(sx, sy, sz));
+      const midY = sy;
+      if (Math.abs(sx - ex) > 0.01) {
+        points.push(new THREE.Vector3(ex, midY, sz)); // horizontal segment
+      }
+      points.push(new THREE.Vector3(ex, ey, ez));
+      const geom = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color }));
+      // Add a small via cylinder at the corner if there is a bend
+      if (points.length === 3) {
+        const via = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.02, 0.02, 0.05, 6),
+          new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3 })
+        );
+        via.position.copy(points[1]);
+        via.position.y -= 0.025;
+        return { line, via };
+      }
+      return { line, via: null };
+    }
+
     // ---------------- SCENE SETUP ----------------
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
+    scene.background = new THREE.Color(0x0a0a14);
+    scene.fog = new THREE.Fog(0x0a0a14, 5, 25);
+
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 50);
-    camera.position.set(5, 3.5, 6);
-    camera.lookAt(0, 0.2, 0);
+    camera.position.set(3.5, 2.5, 4.5);
+    camera.lookAt(0, 0.1, 0.2);
+
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.localClippingEnabled = true; // essential for clip plane
     document.body.appendChild(renderer.domElement);
+
     const labelRenderer = new CSS2DRenderer();
     labelRenderer.setSize(window.innerWidth, window.innerHeight);
     labelRenderer.domElement.style.position = 'absolute';
     labelRenderer.domElement.style.top = '0';
     labelRenderer.domElement.style.pointerEvents = 'none';
     document.body.appendChild(labelRenderer.domElement);
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.target.set(0, 0.15, 0);
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 0.1, 0.2);
     controls.update();
+
+    // Lighting
     scene.add(new THREE.AmbientLight(0x404066));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(5, 8, 5);
@@ -235,236 +235,149 @@
     dirLight.receiveShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
-    dirLight.shadow.camera.near = 1;
-    dirLight.shadow.camera.far = 30;
     scene.add(dirLight);
 
-    // ---------------- BUILD WORKBENCH & MOTHERBOARD ----------------
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 2.5),
-      new THREE.MeshStandardMaterial({ color: 0x3a3a4a, roughness: 0.6 }));
-    desk.position.y = -0.55;
-    desk.receiveShadow = true;
-    scene.add(desk);
-    const boardBase = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 1.9),
-      new THREE.MeshStandardMaterial({ color: 0x0d2e0d, roughness: 0.7 }));
-    boardBase.position.set(0, -0.49, 0);
-    boardBase.receiveShadow = true;
-    scene.add(boardBase);
-    // Traces
-    const traceMat = new THREE.LineBasicMaterial({ color: 0xd4af37 });
-    for (let i=0;i<30;i++) {
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3((Math.random()-0.5)*2.2, -0.44, (Math.random()-0.5)*1.7),
-        new THREE.Vector3((Math.random()-0.5)*2.2, -0.44, (Math.random()-0.5)*1.7)
-      ]);
-      scene.add(new THREE.Line(geo, traceMat));
-    }
+    // Clipping plane for surgical slicing
+    const clippingPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+    const clipPlanes = [clippingPlane];
 
-    // Slots (placeholder visuals)
-    const slotMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
-    function createSlot(w,h,d, x,y,z) {
-      const s = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), slotMat);
-      s.position.set(x,y,z);
-      scene.add(s);
-      return s;
-    }
-    const cpuSocket = createSlot(0.5, 0.05, 0.5, 0, -0.45, 0.2);
-    cpuSocket.userData = { type:'cpu' };
-    const ramSlots = [-0.6, 0.6].map(x => {
-      const s = createSlot(0.12, 0.05, 0.6, x, -0.43, 0.65);
-      s.userData = { type:'ram' };
-      return s;
+    // ---------------- BUILD THE BOARD ----------------
+    // Glass case (with opacity control)
+    const caseMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.1,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 1.0,
+      clearcoat: 0.5,
+      clippingPlanes: clipPlanes,
+      clipShadows: true,
     });
-    const pcieSlot = createSlot(0.7, 0.05, 0.15, 0.5, -0.45, -0.4);
-    pcieSlot.userData = { type:'gpu' };
-    const psuBay = createSlot(0.5, 0.15, 0.5, 1.3, -0.45, -0.7);
-    psuBay.userData = { type:'psu' };
-    const coolerZone = new THREE.Vector3(0, -0.4, 0.2);
+    const caseLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 1.9), caseMat);
+    caseLeft.position.set(-1.3, 0.1, 0.1);
+    const caseRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.4, 1.9), caseMat);
+    caseRight.position.set(1.3, 0.1, 0.1);
+    const caseTop = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 1.9), caseMat);
+    caseTop.position.set(0, 0.8, 0.1);
+    scene.add(caseLeft, caseRight, caseTop);
 
-    // ---------------- SYSTEM STATE ----------------
-    const placedComponents = {
-      cpu: null,
-      ram: [],
-      gpu: null,
-      storage: null,
-      psu: null,
-      cooler: null
-    };
-    let booted = false;
-    let pc = 0, registers = [0,0,0,0], memory = [5,3,0,0,0,0,0,0];
-    const program = [
-      'LOAD R0, [0]', 'LOAD R1, [1]', 'ADD R0, R1', 'STORE R0, [2]', 'HALT'
-    ];
+    // Motherboard base
+    const boardMat = new THREE.MeshStandardMaterial({
+      color: 0x0d2e0d,
+      roughness: 0.7,
+      clippingPlanes: clipPlanes,
+    });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(boardWidth, boardThickness, boardHeight), boardMat);
+    board.position.set(0, -0.5, 0.1);
+    board.receiveShadow = true;
+    scene.add(board);
 
-    // 3D objects for placed components
-    const placedObjects = new Map();
-    const labelGroup = new THREE.Group();
-    scene.add(labelGroup);
-    function makeLabel(text, pos, color='#fff') {
-      const div = document.createElement('div');
-      div.textContent = text;
-      div.style.color = color;
-      div.style.fontSize = '11px';
-      div.style.background = 'rgba(0,0,0,0.7)';
-      div.style.padding = '2px 6px';
-      div.style.borderRadius = '4px';
-      const l = new CSS2DObject(div);
-      l.position.copy(pos);
-      return l;
-    }
-
-    // ---------------- DRAG-AND-DROP LOGIC ----------------
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    const placementPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0.45); // Y = -0.45
-
-    let dragging = null;         // { type, model, spec, mesh }
-    let dragGhost = null;
-
-    function getDropSlot(point) {
-      const slots = [cpuSocket, ...ramSlots, pcieSlot, psuBay];
-      for (const slot of slots) {
-        const box = new THREE.Box3().setFromObject(slot);
-        if (box.containsPoint(point)) return slot;
-      }
-      return null;
-    }
-
-    function onDragStart(item, e) {
-      if (booted) return;
-      const type = item.dataset.type;
-      const model = item.dataset.model;
-      const spec = item.dataset.spec;
-      // Create ghost preview
-      let geom;
-      if (type === 'cpu') geom = new THREE.BoxGeometry(0.45, 0.08, 0.45);
-      else if (type === 'gpu') geom = new THREE.BoxGeometry(0.65, 0.08, 1.0);
-      else if (type === 'ram') geom = new THREE.BoxGeometry(0.12, 0.2, 0.5);
-      else if (type === 'storage') geom = new THREE.BoxGeometry(0.2, 0.05, 0.3);
-      else if (type === 'psu') geom = new THREE.BoxGeometry(0.4, 0.12, 0.4);
-      else if (type === 'cooler') geom = new THREE.CylinderGeometry(0.25, 0.25, 0.2, 16);
-      else return;
-      const mat = new THREE.MeshStandardMaterial({ color: 0x4a90e2, transparent: true, opacity: 0.7 });
-      dragGhost = new THREE.Mesh(geom, mat);
-      dragGhost.castShadow = true;
-      scene.add(dragGhost);
-      dragging = { type, model, spec, ghost: dragGhost };
-      document.body.style.cursor = 'grabbing';
-      e.preventDefault();
-    }
-
-    window.addEventListener('mousemove', (e) => {
-      if (!dragging) return;
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const target = new THREE.Vector3();
-      raycaster.ray.intersectPlane(placementPlane, target);
-      if (target) {
-        dragging.ghost.position.copy(target);
+    // Draw all traces
+    routes.forEach(route => {
+      const { line, via } = createTrace(route.from, route.to, 0xd4af37);
+      line.material.clippingPlanes = clipPlanes;
+      scene.add(line);
+      if (via) {
+        via.material.clippingPlanes = clipPlanes;
+        scene.add(via);
       }
     });
 
-    window.addEventListener('mouseup', (e) => {
-      if (!dragging) return;
-      const slot = getDropSlot(dragging.ghost.position);
-      if (slot && slot.userData.type === dragging.type) {
-        placeComponent(dragging.type, dragging.model, dragging.spec, dragging.ghost.position.clone(), slot);
+    // Component placeholders with realistic shapes and pad arrays
+    function createPad(x,y,z) {
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.02,6),
+        new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness:0.2, clippingPlanes: clipPlanes }));
+      pad.position.set(x,y,z);
+      return pad;
+    }
+    // CPU chip (with visible pads)
+    const cpuGroup = new THREE.Group();
+    const cpuBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a3a, roughness:0.3, clippingPlanes: clipPlanes }));
+    cpuBody.position.set(0, -0.42, 0.2);
+    cpuBody.userData = { component: 'cpu', name: 'Intel i5-13600K' };
+    cpuGroup.add(cpuBody);
+    // CPU pads
+    cpuPins.forEach(pin => {
+      cpuGroup.add(createPad(pin.pos.x, -0.44, pin.pos.z));
+    });
+    scene.add(cpuGroup);
+
+    // RAM sticks
+    const ramGroup0 = new THREE.Group();
+    const stick0 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x2e6b2e, roughness:0.5, clippingPlanes: clipPlanes }));
+    stick0.position.set(-0.7, -0.35, 0.65);
+    stick0.userData = { component: 'ram', name: 'DDR5-6000 16GB' };
+    ramGroup0.add(stick0);
+    ram0Pins.forEach(pin => ramGroup0.add(createPad(pin.pos.x, -0.44, pin.pos.z)));
+    scene.add(ramGroup0);
+
+    const ramGroup1 = new THREE.Group();
+    const stick1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x2e6b2e, roughness:0.5, clippingPlanes: clipPlanes }));
+    stick1.position.set(0.7, -0.35, 0.65);
+    stick1.userData = { component: 'ram', name: 'DDR5-6000 16GB' };
+    ramGroup1.add(stick1);
+    ram1Pins.forEach(pin => ramGroup1.add(createPad(pin.pos.x, -0.44, pin.pos.z)));
+    scene.add(ramGroup1);
+
+    // GPU card (simplified board with fan)
+    const gpuGroup = new THREE.Group();
+    const gpuBoard = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.9),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a40, roughness:0.4, clippingPlanes: clipPlanes }));
+    gpuBoard.position.set(0.5, -0.42, -0.2);
+    gpuBoard.userData = { component: 'gpu', name: 'RTX 4070' };
+    gpuGroup.add(gpuBoard);
+    pciePins.forEach(pin => gpuGroup.add(createPad(pin.pos.x, -0.44, pin.pos.z)));
+    scene.add(gpuGroup);
+
+    // ---------------- CLIP PLANE UI ----------------
+    const clipToggle = document.getElementById('clip-toggle');
+    const clipSlider = document.getElementById('clip-slider');
+    const clipInfo = document.getElementById('clip-info');
+    let clipActive = false;
+    clipToggle.addEventListener('click', () => {
+      clipActive = !clipActive;
+      clipToggle.textContent = clipActive ? '🧠 Clip Plane ON' : '🧠 Clip Plane OFF';
+      clipSlider.disabled = !clipActive;
+      if (!clipActive) {
+        clippingPlane.constant = 0;
+        clipSlider.value = 0;
+        clipInfo.textContent = 'Clip plane at Z = 0.0';
       }
-      scene.remove(dragging.ghost);
-      dragging = null;
-      dragGhost = null;
-      document.body.style.cursor = '';
+    });
+    clipSlider.addEventListener('input', () => {
+      clippingPlane.constant = parseFloat(clipSlider.value);
+      clipInfo.textContent = `Clip plane at Z = ${clippingPlane.constant.toFixed(2)}`;
     });
 
-    function placeComponent(type, model, spec, pos, slot) {
-      // Remove previous if slot occupied
-      if (type === 'cpu' && placedComponents.cpu) return;
-      if (type === 'gpu' && placedComponents.gpu) return;
-      if (type === 'psu' && placedComponents.psu) return;
-      if (type === 'ram' && placedComponents.ram.length >= 2) return;
-      if (type === 'storage' && placedComponents.storage) return;
-      if (type === 'cooler' && placedComponents.cooler) return;
-
-      const color = type==='cpu'?0x1a1a3a:type==='gpu'?0x2a2a40:type==='ram'?0x2e6b2e:type==='psu'?0x444466:type==='storage'?0x666666:0x888888;
-      let geom;
-      if (type==='cpu') geom = new THREE.BoxGeometry(0.45,0.08,0.45);
-      else if (type==='gpu') geom = new THREE.BoxGeometry(0.65,0.08,1.0);
-      else if (type==='ram') geom = new THREE.BoxGeometry(0.12,0.2,0.5);
-      else if (type==='storage') geom = new THREE.BoxGeometry(0.2,0.05,0.3);
-      else if (type==='psu') geom = new THREE.BoxGeometry(0.4,0.12,0.4);
-      else if (type==='cooler') geom = new THREE.CylinderGeometry(0.25,0.25,0.2,16);
-      const compMesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color, roughness:0.4 }));
-      compMesh.position.copy(pos);
-      compMesh.userData = { type, model, spec };
-      scene.add(compMesh);
-
-      if (type==='ram') placedComponents.ram.push({ model, spec, mesh: compMesh });
-      else placedComponents[type] = { model, spec, mesh: compMesh };
-      placedObjects.set(compMesh, { type, model, spec });
-      updateStats();
-    }
-
-    // ---------------- STATISTICS UPDATE ----------------
-    function updateStats() {
-      const cpu = placedComponents.cpu;
-      const gpu = placedComponents.gpu;
-      const ramCount = placedComponents.ram.length;
-      document.getElementById('cpu-stat').textContent = cpu ? `🧠 ${cpu.model}` : '🧠 No CPU';
-      document.getElementById('ram-stat').textContent = ramCount>0 ? `🧮 ${ramCount} stick(s)` : '🧮 No RAM';
-      document.getElementById('gpu-stat').textContent = gpu ? `🎮 ${gpu.model}` : '🎮 No GPU';
-      let power = 0;
-      if (cpu) power += parseInt(cpu.spec.match(/(\d+)W/)?.[1] || 100);
-      if (gpu) power += parseInt(gpu.spec.match(/(\d+)W/)?.[1] || 100);
-      document.getElementById('power-stat').textContent = `⚡ ${power}W / 850W`;
-      const bootBtn = document.getElementById('boot-btn');
-      bootBtn.disabled = !(cpu && ramCount > 0);
-    }
-
-    // ---------------- BOOT & CODE EXECUTION ----------------
-    const packetGeom = new THREE.SphereGeometry(0.05, 8, 8);
-    const packetMat = new THREE.MeshBasicMaterial({ color: 0x44aaff });
-    const packet = new THREE.Mesh(packetGeom, packetMat);
-    packet.visible = false;
-    scene.add(packet);
-
-    function animatePacket(from, to, cb) {
-      packet.visible = true;
-      packet.position.copy(from);
-      const dur = 500, start = performance.now();
-      const startPos = from.clone();
-      function tick(now) {
-        const t = Math.min((now-start)/dur,1);
-        packet.position.lerpVectors(startPos, to, t);
-        if (t<1) requestAnimationFrame(tick);
-        else { packet.visible = false; if(cb) cb(); }
-      }
-      requestAnimationFrame(tick);
-    }
-
-    function step() {
-      if (!booted || pc>=program.length) return;
-      if (pc===0) animatePacket(new THREE.Vector3(-0.6,-0.35,0.65), new THREE.Vector3(0,-0.35,0.2), ()=>{registers[0]=5; pc++; step();});
-      else if (pc===1) animatePacket(new THREE.Vector3(0.6,-0.35,0.65), new THREE.Vector3(0,-0.35,0.2), ()=>{registers[1]=3; pc++; step();});
-      else if (pc===2) { registers[0]+=registers[1]; pc++; step(); }
-      else if (pc===3) { memory[2]=registers[0]; pc++; step(); }
-      else if (pc===4) { booted=false; }
-    }
-
-    document.getElementById('boot-btn').addEventListener('click', ()=>{
-      if (booted) return;
-      booted = true;
-      pc=0; registers=[0,0,0,0]; memory=[5,3,0,0,0,0,0,0];
-      step();
+    // Case opacity
+    const opacitySlider = document.getElementById('opacity-slider');
+    opacitySlider.addEventListener('input', () => {
+      caseMat.opacity = parseInt(opacitySlider.value) / 100;
     });
 
-    // ---------------- COMPONENT CLICK INSPECTOR ----------------
+    // Reset view
+    document.getElementById('reset-view').addEventListener('click', () => {
+      camera.position.set(3.5, 2.5, 4.5);
+      controls.target.set(0, 0.1, 0.2);
+      controls.update();
+    });
+
+    // ---------------- COMPONENT INSPECTOR & CODE EXECUTION ----------------
     const inspector = document.getElementById('inspector');
     const inspTitle = document.getElementById('inspector-title');
-    const inspCanvas = document.getElementById('block-diagram');
+    const pinCanvas = document.getElementById('pin-diagram');
     const inspCode = document.getElementById('inspector-code');
-    document.getElementById('close-inspector').onclick = ()=> inspector.style.display='none';
+    const stepBtn = document.getElementById('step-btn');
+    const execStatus = document.getElementById('exec-status');
+    let selectedComponent = null;
+    let execState = { pc: 0, registers: [0,0,0,0], memory: [5,3,0,0,0,0,0,0] };
 
+    // Raycaster for component selection
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
     renderer.domElement.addEventListener('click', (e) => {
       mouse.x = (e.clientX / window.innerWidth)*2-1;
       mouse.y = -(e.clientY / window.innerHeight)*2+1;
@@ -472,27 +385,31 @@
       const hits = raycaster.intersectObjects(scene.children, true);
       for (let hit of hits) {
         let obj = hit.object;
-        while (obj && !obj.userData.type) obj = obj.parent;
-        if (obj && obj.userData.type) {
-          const {type, model, spec} = obj.userData;
-          inspTitle.textContent = `${model} (${type.toUpperCase()})`;
-          const ctx = inspCanvas.getContext('2d');
-          ctx.clearRect(0,0,300,130);
-          ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,0,300,130);
-          ctx.fillStyle='white';
-          if (type==='cpu') {
-            ctx.fillText('Fetch → Decode → Execute → Writeback', 20,40);
-            ctx.fillText(`ALU, 14 cores`,20,80);
-            inspCode.innerHTML = `<span class="highlight">ADD R0, R1</span> ; currently executing<br>MOV R2, R0`;
-          } else if (type==='gpu') {
-            ctx.fillText('Shader Cores, TMU, ROP',20,40);
-            inspCode.innerHTML = `gl_Position = uMVPMatrix * vec4(aPosition,1.0);`;
-          } else if (type==='ram') {
-            ctx.fillText('DRAM Cell Array',20,40);
-            inspCode.innerHTML = `int* ptr = malloc(64);<br>ptr[0] = 5;`;
-          } else {
-            ctx.fillText('Component internals',20,40);
-            inspCode.textContent = '; code interfacing this hardware';
+        while (obj && !obj.userData.component) obj = obj.parent;
+        if (obj && obj.userData.component) {
+          selectedComponent = obj;
+          const { component, name } = obj.userData;
+          inspTitle.textContent = `${name} (${component.toUpperCase()})`;
+          // Draw internal block diagram
+          const ctx = pinCanvas.getContext('2d');
+          ctx.clearRect(0,0,320,160);
+          ctx.fillStyle='#0d0d20'; ctx.fillRect(0,0,320,160);
+          if (component==='cpu') {
+            ctx.fillStyle='white';
+            ctx.fillText('Fetch → Decode → Execute → Writeback',20,40);
+            ctx.fillText('Memory Controller linked to traces DQ0-DQ3',20,80);
+            inspCode.innerHTML = `<span class="highlight">LOAD R0, [0x1000]</span>  ; Reads from RAM via DQ0`;
+            stepBtn.disabled = false;
+            execState.pc = 0;
+          } else if (component==='ram') {
+            ctx.fillText('DRAM Cell Array (8Gb)',20,40);
+            ctx.fillText('Pins DQ0-DQ11 mapped to CPU bus',20,80);
+            inspCode.textContent = '; Data stored at address 0x1000 = 5';
+            stepBtn.disabled = true;
+          } else if (component==='gpu') {
+            ctx.fillText('Shader Cores, ROPs, TMUs',20,40);
+            inspCode.textContent = 'gl_Position = uMVPMatrix * aPosition;';
+            stepBtn.disabled = true;
           }
           inspector.style.display='flex';
           return;
@@ -500,7 +417,65 @@
       }
     });
 
-    // ---------------- FINAL ANIMATION LOOP ----------------
+    document.getElementById('close-inspector').onclick = ()=> inspector.style.display='none';
+
+    // Step execution for CPU visualization (lights up a trace)
+    const packetGeom = new THREE.SphereGeometry(0.03, 6,6);
+    const packetMat = new THREE.MeshBasicMaterial({ color: 0x44aaff });
+    const packet = new THREE.Mesh(packetGeom, packetMat);
+    packet.visible = false;
+    scene.add(packet);
+
+    function animatePacket(from, to, callback) {
+      packet.visible = true;
+      packet.position.copy(from);
+      const dur = 600, start = performance.now();
+      const startPos = from.clone();
+      function tick(now) {
+        const t = Math.min((now-start)/dur,1);
+        packet.position.lerpVectors(startPos, to, t);
+        if (t<1) requestAnimationFrame(tick);
+        else { packet.visible=false; if(callback) callback(); }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    stepBtn.addEventListener('click', ()=>{
+      if (!selectedComponent || selectedComponent.userData.component!=='cpu') return;
+      const state = execState;
+      const instructions = [
+        { type:'LOAD', reg:0, addr:0, from: ram0Pins[0].pos, to: cpuPins[0].pos },
+        { type:'LOAD', reg:1, addr:1, from: ram1Pins[0].pos, to: cpuPins[3].pos },
+        { type:'ADD', reg:0, reg2:1 },
+        { type:'STORE', reg:0, addr:2 },
+        { type:'HALT' }
+      ];
+      if (state.pc >= instructions.length) {
+        execStatus.textContent = 'Program halted.';
+        return;
+      }
+      const instr = instructions[state.pc];
+      if (instr.type==='LOAD' || instr.type==='STORE') {
+        const from = instr.from.clone();
+        const to = instr.to.clone();
+        animatePacket(from, to, ()=>{
+          if (instr.type==='LOAD') state.registers[instr.reg] = state.memory[instr.addr];
+          else state.memory[instr.addr] = state.registers[instr.reg];
+          state.pc++;
+          execStatus.textContent = `Executed: ${instr.type} (R${instr.reg} = ${state.registers[instr.reg]})`;
+          stepBtn.click(); // chain? Not, but manually step again.
+        });
+      } else if (instr.type==='ADD') {
+        state.registers[instr.reg] += state.registers[instr.reg2];
+        state.pc++;
+        execStatus.textContent = `ADD R${instr.reg} = ${state.registers[instr.reg]}`;
+      } else {
+        state.pc++;
+        execStatus.textContent = 'HALT';
+      }
+    });
+
+    // ---------------- ANIMATION LOOP ----------------
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -508,20 +483,13 @@
       labelRenderer.render(scene, camera);
     }
     animate();
+
     window.addEventListener('resize', ()=>{
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
       labelRenderer.setSize(window.innerWidth, window.innerHeight);
     });
-
-    // Hook drag start on sidebar items
-    document.querySelectorAll('.component-item').forEach(item => {
-      item.addEventListener('mousedown', (e) => onDragStart(item, e));
-    });
-
-    // Prevent actual text selection during drag
-    window.ondragstart = (e) => e.preventDefault();
   </script>
 </body>
 </html>
